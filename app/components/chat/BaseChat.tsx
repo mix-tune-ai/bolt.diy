@@ -65,6 +65,7 @@ interface BaseChatProps {
   setImageDataList?: (dataList: string[]) => void;
   actionAlert?: ActionAlert;
   clearAlert?: () => void;
+  hasReachedTokenLimit?: boolean;
 }
 
 export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
@@ -98,6 +99,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       messages,
       actionAlert,
       clearAlert,
+      hasReachedTokenLimit,
     },
     ref,
   ) => {
@@ -440,6 +442,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                               'w-full pl-4 pt-4 pr-16 outline-none resize-none text-bolt-elements-textPrimary placeholder-bolt-elements-textTertiary bg-transparent text-sm',
                               'transition-all duration-200',
                               'hover:border-bolt-elements-focus',
+                              hasReachedTokenLimit ? 'opacity-50 cursor-not-allowed' : '',
                             )}
                             onDragEnter={(e) => {
                               e.preventDefault();
@@ -501,8 +504,9 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                               minHeight: TEXTAREA_MIN_HEIGHT,
                               maxHeight: TEXTAREA_MAX_HEIGHT,
                             }}
-                            placeholder="How can Bolt help you today?"
+                            placeholder={hasReachedTokenLimit ? 'Token limit reached. Subscribe to Pro for more usage.' : 'How can Bolt help you today?'}
                             translate="no"
+                            disabled={hasReachedTokenLimit}
                           />
                         </div>
                         <ClientOnly>
@@ -510,7 +514,7 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                             <SendButton
                               show={input.length > 0 || isStreaming || uploadedFiles.length > 0}
                               isStreaming={isStreaming}
-                              disabled={!providerList || providerList.length === 0}
+                              disabled={!providerList || providerList.length === 0 || hasReachedTokenLimit}
                               onClick={(event) => {
                                 if (isStreaming) {
                                   handleStop?.();
