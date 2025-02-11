@@ -11,7 +11,7 @@ interface HistoryEntryProps {
   };
 }
 
-export function HistoryEntry({ entry, expanded, onToggle, formatters }: HistoryEntryProps) {
+export default function HistoryEntry({ entry, expanded, onToggle, formatters }: HistoryEntryProps) {
   const getStatusIcon = (status: 'success' | 'partial' | 'failed') => {
     switch (status) {
       case 'success':

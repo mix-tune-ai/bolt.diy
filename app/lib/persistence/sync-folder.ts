@@ -1,4 +1,5 @@
 import { openDB } from 'idb';
+import type { IDBPDatabase } from 'idb';
 import '~/types/file-system';
 
 const DB_NAME = 'bolt_sync';
@@ -8,7 +9,7 @@ const HANDLE_KEY = 'folder_handle';
 // Open the IndexedDB database
 const openSyncDB = () => {
   return openDB(DB_NAME, 1, {
-    upgrade(db) {
+    upgrade(db: IDBPDatabase) {
       db.createObjectStore(STORE_NAME);
     },
   });

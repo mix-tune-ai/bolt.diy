@@ -1,6 +1,6 @@
 import type { Message } from 'ai';
 import { createScopedLogger } from '~/utils/logger';
-import type { ChatHistoryItem } from './useChatHistory';
+import type { ChatHistoryItem, IChatMetadata } from '~/types/chat';
 
 const logger = createScopedLogger('ChatHistory');
 const MAX_RETRIES = 3;
@@ -103,6 +103,7 @@ export async function setMessages(
   urlId?: string,
   description?: string,
   timestamp?: string,
+  metadata?: IChatMetadata,
 ): Promise<void> {
   return withRetry(
     () =>
@@ -121,6 +122,7 @@ export async function setMessages(
           urlId,
           description,
           timestamp: timestamp ?? new Date().toISOString(),
+          metadata,
         });
 
         request.onsuccess = () => resolve();
@@ -240,7 +242,12 @@ export async function forkChat(db: IDBDatabase, chatId: string, messageId: strin
   // Get messages up to and including the selected message
   const messages = chat.messages.slice(0, messageIndex + 1);
 
-  return createChatFromMessages(db, chat.description ? `${chat.description} (fork)` : 'Forked chat', messages);
+  return createChatFromMessages(
+    db,
+    chat.description ? `${chat.description} (fork)` : 'Forked chat',
+    messages,
+    chat.metadata,
+  );
 }
 
 export async function duplicateChat(db: IDBDatabase, id: string): Promise<string> {
@@ -250,13 +257,14 @@ export async function duplicateChat(db: IDBDatabase, id: string): Promise<string
     throw new Error('Chat not found');
   }
 
-  return createChatFromMessages(db, `${chat.description || 'Chat'} (copy)`, chat.messages);
+  return createChatFromMessages(db, `${chat.description || 'Chat'} (copy)`, chat.messages, chat.metadata);
 }
 
 export async function createChatFromMessages(
   db: IDBDatabase,
   description: string,
   messages: Message[],
+  metadata?: IChatMetadata,
 ): Promise<string> {
   const newId = await getNextId(db);
   const newUrlId = await getUrlId(db, newId); // Get a new urlId for the duplicated chat
@@ -267,6 +275,8 @@ export async function createChatFromMessages(
     messages,
     newUrlId, // Use the new urlId
     description,
+    undefined,
+    metadata,
   );
 
   return newUrlId; // Return the urlId instead of id for navigation

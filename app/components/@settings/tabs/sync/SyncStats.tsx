@@ -1,20 +1,20 @@
 import { useStore } from '@nanostores/react';
 import { workbenchStore } from '~/lib/stores/workbench';
-import type { SyncHistoryEntry, SyncSession } from '~/types/sync';
+import type { SyncHistoryEntry, SyncSession, TimeRange } from '~/types/sync';
 import { useEffect, useState, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-toastify';
 import { IconButton } from '~/components/ui/IconButton';
 import { classNames } from '~/utils/classNames';
-import { StatsCard } from './components/StatsCard';
-import { TimeRangeSelector } from './components/TimeRangeSelector';
-import { HistoryEntry } from './components/HistoryEntry';
+import StatsCard from './StatsCard';
+import TimeRangeSelector from './TimeRangeSelector';
+import HistoryEntry from './HistoryEntry';
 
 const timeRangeOptions = [
-  { value: '24h', label: 'Last 24h' },
-  { value: '7d', label: 'Last 7d' },
-  { value: '30d', label: 'Last 30d' },
-  { value: 'all', label: 'All time' },
+  { value: '24h' as TimeRange, label: 'Last 24h' },
+  { value: '7d' as TimeRange, label: 'Last 7d' },
+  { value: '30d' as TimeRange, label: 'Last 30d' },
+  { value: 'all' as TimeRange, label: 'All time' },
 ];
 
 const SYNC_HISTORY_KEY = 'syncHistory';
@@ -25,7 +25,7 @@ export default function SyncStats() {
   const currentSession = useStore(workbenchStore.currentSession);
   const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
-  const [selectedTimeRange, setSelectedTimeRange] = useState<'24h' | '7d' | '30d' | 'all'>('all');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('all');
   const [isClearing, setIsClearing] = useState(false);
   const [page, setPage] = useState(1);
 
@@ -184,14 +184,15 @@ export default function SyncStats() {
 
     const calculateTrend = (current: number, previous: number) => {
       if (previous === 0) {
-        return null;
+        return undefined;
       }
 
       const change = ((current - previous) / previous) * 100;
+      const value = Math.abs(Math.round(change));
 
       return {
-        value: Math.abs(Math.round(change)),
-        isPositive: change >= 0,
+        value,
+        label: `${value}% ${change >= 0 ? 'increase' : 'decrease'}`,
       };
     };
 
@@ -234,7 +235,7 @@ export default function SyncStats() {
           <h3 className="text-lg font-medium text-bolt-elements-textPrimary">Sync History</h3>
           <TimeRangeSelector
             value={selectedTimeRange}
-            onChange={(value) => setSelectedTimeRange(value as typeof selectedTimeRange)}
+            onChange={(value: TimeRange) => setSelectedTimeRange(value)}
             options={timeRangeOptions}
           />
         </div>
@@ -251,26 +252,26 @@ export default function SyncStats() {
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatsCard icon="i-ph:list-numbers" label="Total Syncs" value={totalSyncs} color="blue" trend={trends.syncs} />
+        <StatsCard icon="i-ph:list-numbers" label="Total Syncs" value={totalSyncs} _color="blue" trend={trends.syncs} />
         <StatsCard
           icon="i-ph:files"
           label="Files Synced"
           value={totalFilesSynced}
-          color="purple"
+          _color="purple"
           trend={trends.files}
         />
         <StatsCard
           icon="i-ph:database"
           label="Data Synced"
           value={formatFileSize(totalDataSynced)}
-          color="green"
+          _color="green"
           trend={trends.data}
         />
         <StatsCard
           icon="i-ph:timer"
-          label="Avg Duration"
+          label="Average Duration"
           value={`${averageDuration.toFixed(1)}s`}
-          color="yellow"
+          _color="orange"
           trend={trends.duration}
         />
       </div>

@@ -23,6 +23,7 @@ import { toast } from 'react-toastify';
 import ignore from 'ignore';
 import { ProjectFolderManager } from '~/lib/persistence/project-folders';
 import { clearSyncFolderHandle, loadSyncFolderHandle, saveSyncFolderHandle } from '~/lib/persistence/sync-folder';
+import { getLocalStorage, setLocalStorage } from '~/lib/persistence';
 
 // Destructure saveAs from the CommonJS module
 const { saveAs } = fileSaver;
@@ -127,7 +128,7 @@ export class WorkbenchStore {
 
     // Subscribe to sync settings changes to persist them and update sync interval
     this.syncSettings.subscribe((settings) => {
-      localStorage.setItem('syncSettings', JSON.stringify(settings));
+      setLocalStorage('syncSettings', settings);
 
       // Clear existing interval if any
       if (this.syncIntervalId) {
@@ -1362,42 +1363,30 @@ export class WorkbenchStore {
   }
 
   async loadSyncSettings() {
-    try {
-      const savedSettings = localStorage.getItem('syncSettings');
+    const savedSettings = getLocalStorage('syncSettings');
 
-      if (savedSettings) {
-        const settings = JSON.parse(savedSettings);
+    if (savedSettings) {
+      this.syncSettings.set({
+        ...this.syncSettings.get(),
+        ...savedSettings,
 
-        this.syncSettings.set({
-          ...this.syncSettings.get(),
-          ...settings,
-
-          // Ensure new fields have default values
-          autoSyncInterval: settings.autoSyncInterval ?? 5, // Default to 5 minutes
-          projectFolders: settings.projectFolders ?? {},
-        });
-      } else {
-        // Initialize with default values
-        this.syncSettings.set({
-          ...this.syncSettings.get(),
-          autoSyncInterval: 5,
-          projectFolders: {},
-        });
-      }
-    } catch (error) {
-      console.error('Failed to load sync settings:', error);
+        // Ensure new fields have default values
+        autoSyncInterval: savedSettings.autoSyncInterval ?? 5, // Default to 5 minutes
+        projectFolders: savedSettings.projectFolders ?? {},
+      });
+    } else {
+      // Initialize with default values
+      this.syncSettings.set({
+        ...this.syncSettings.get(),
+        autoSyncInterval: 5,
+        projectFolders: {},
+      });
     }
   }
 
   async saveSyncSettings(settings: SyncSettings) {
-    try {
-      this.syncSettings.set(settings);
-
-      // The subscription in constructor will handle saving to localStorage
-    } catch (error) {
-      console.error('Failed to save sync settings:', error);
-      throw error;
-    }
+    this.syncSettings.set(settings);
+    setLocalStorage('syncSettings', settings);
   }
 
   private _normalizeProjectName(name: string): string {
