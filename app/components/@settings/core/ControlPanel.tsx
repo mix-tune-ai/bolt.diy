@@ -38,7 +38,7 @@ import CloudProvidersTab from '~/components/@settings/tabs/providers/cloud/Cloud
 import ServiceStatusTab from '~/components/@settings/tabs/providers/status/ServiceStatusTab';
 import LocalProvidersTab from '~/components/@settings/tabs/providers/local/LocalProvidersTab';
 import TaskManagerTab from '~/components/@settings/tabs/task-manager/TaskManagerTab';
-import SyncTab from '~/components/@settings/tabs/sync/SyncTab';
+import { SyncTab } from '~/components/@settings/tabs/sync/SyncTab/index';
 
 interface ControlPanelProps {
   open: boolean;

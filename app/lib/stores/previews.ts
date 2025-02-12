@@ -152,21 +152,35 @@ export class PreviewsStore {
     });
 
     try {
-      // Watch for file changes
-      const watcher = await webcontainer.fs.watch('**/*', { persistent: true });
+      // Simple file watching implementation
+      const watcher = await webcontainer.fs.watch('.');
 
-      // Use the native watch events
-      (watcher as any).addEventListener('change', async () => {
-        const previews = this.previews.get();
+      if (watcher) {
+        this.#watchedFiles.add('.');
 
-        for (const preview of previews) {
-          const previewId = this.getPreviewId(preview.baseUrl);
+        // Periodically check for changes
+        const checkChanges = () => {
+          const previews = this.previews.get();
 
-          if (previewId) {
-            this.broadcastFileChange(previewId);
+          for (const preview of previews) {
+            const previewId = this.getPreviewId(preview.baseUrl);
+
+            if (previewId) {
+              this.broadcastFileChange(previewId);
+            }
           }
+        };
+
+        // Check for changes every 2 seconds
+        const interval = setInterval(checkChanges, 2000);
+
+        // Clean up interval when component unmounts
+        if (typeof window !== 'undefined') {
+          window.addEventListener('beforeunload', () => {
+            clearInterval(interval);
+          });
         }
-      });
+      }
 
       // Watch for DOM changes that might affect storage
       if (typeof window !== 'undefined') {

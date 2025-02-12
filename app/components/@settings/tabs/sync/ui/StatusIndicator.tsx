@@ -1,6 +1,6 @@
 import { classNames } from '~/utils/classNames';
 
-interface SyncStatusIndicatorProps {
+export interface SyncStatusIndicatorProps {
   status: 'idle' | 'syncing' | 'error';
 }
 

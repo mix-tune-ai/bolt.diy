@@ -1,14 +1,15 @@
 import { useStore } from '@nanostores/react';
 import { workbenchStore } from '~/lib/stores/workbench';
-import type { SyncHistoryEntry, SyncSession, TimeRange } from '~/types/sync';
+import { syncHistoryStore, clearSyncHistory } from '~/lib/stores/sync';
+import type { SyncSession, TimeRange } from '~/types/sync';
 import { useEffect, useState, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-toastify';
 import { IconButton } from '~/components/ui/IconButton';
 import { classNames } from '~/utils/classNames';
-import StatsCard from './StatsCard';
-import TimeRangeSelector from './TimeRangeSelector';
-import HistoryEntry from './HistoryEntry';
+import StatsCard from '~/components/@settings/tabs/sync/ui/StatsCard';
+import TimeRangeSelector from '~/components/@settings/tabs/sync/ui/TimeRangeSelector';
+import HistoryEntry from '~/components/@settings/tabs/sync/SyncStats/components/HistoryEntry';
 
 const timeRangeOptions = [
   { value: '24h' as TimeRange, label: 'Last 24h' },
@@ -17,77 +18,15 @@ const timeRangeOptions = [
   { value: 'all' as TimeRange, label: 'All time' },
 ];
 
-const SYNC_HISTORY_KEY = 'syncHistory';
 const ITEMS_PER_PAGE = 10;
-const UPDATE_INTERVAL = 10000; // 10 seconds
 
 export default function SyncStats() {
   const currentSession = useStore(workbenchStore.currentSession);
-  const [syncHistory, setSyncHistory] = useState<SyncHistoryEntry[]>([]);
+  const syncHistory = useStore(syncHistoryStore);
   const [expandedEntries, setExpandedEntries] = useState<Set<string>>(new Set());
   const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRange>('all');
   const [isClearing, setIsClearing] = useState(false);
   const [page, setPage] = useState(1);
-
-  // Load initial history from localStorage and set up real-time updates
-  useEffect(() => {
-    const loadHistory = () => {
-      try {
-        const history = JSON.parse(localStorage.getItem(SYNC_HISTORY_KEY) || '[]');
-
-        if (Array.isArray(history)) {
-          setSyncHistory(history);
-        } else {
-          console.error('Invalid sync history format in localStorage');
-          localStorage.setItem(SYNC_HISTORY_KEY, '[]');
-          setSyncHistory([]);
-        }
-      } catch (error) {
-        console.error('Failed to load sync history:', error);
-        localStorage.setItem(SYNC_HISTORY_KEY, '[]');
-        setSyncHistory([]);
-      }
-    };
-
-    // Initial load
-    loadHistory();
-
-    // Set up polling interval for real-time updates
-    const interval = setInterval(loadHistory, UPDATE_INTERVAL);
-
-    return () => clearInterval(interval);
-  }, []);
-
-  // Update history when new syncs happen
-  useEffect(() => {
-    if (currentSession?.history) {
-      setSyncHistory((prev) => {
-        try {
-          const newHistory = [...prev];
-
-          for (const entry of currentSession.history) {
-            const existingIndex = newHistory.findIndex((h) => h.id === entry.id);
-
-            if (existingIndex === -1) {
-              newHistory.push(entry);
-            } else {
-              newHistory[existingIndex] = entry;
-            }
-          }
-
-          newHistory.sort((a, b) => b.timestamp - a.timestamp);
-
-          const latestHistory = newHistory.slice(0, 100);
-          localStorage.setItem(SYNC_HISTORY_KEY, JSON.stringify(latestHistory));
-
-          return latestHistory;
-        } catch (error) {
-          console.error('Failed to update sync history:', error);
-          return prev;
-        }
-      });
-    }
-  }, [currentSession?.history]);
 
   // Reset page when time range changes
   useEffect(() => {
@@ -102,8 +41,7 @@ export default function SyncStats() {
     if (confirm('Are you sure you want to clear all sync history? This cannot be undone.')) {
       try {
         setIsClearing(true);
-        localStorage.setItem(SYNC_HISTORY_KEY, '[]');
-        setSyncHistory([]);
+        clearSyncHistory();
         setExpandedEntries(new Set());
 
         if (currentSession) {
@@ -276,51 +214,6 @@ export default function SyncStats() {
         />
       </div>
 
-      {filteredHistory.length > 0 && (
-        <div className="bg-bolt-elements-background-depth-3 p-3 rounded-lg border border-bolt-elements-borderColor/10">
-          <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-bolt-elements-textPrimary">
-            <div className="i-ph:clock-clockwise text-blue-400" />
-            Latest Sync
-          </h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="i-ph:folder text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary truncate">
-                  {filteredHistory[0].projectName}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="i-ph:clock text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary">
-                  {formatDistanceToNow(filteredHistory[0].timestamp)} ago
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="i-ph:files text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary">
-                  {filteredHistory[0].statistics.totalFiles} files
-                </span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="i-ph:database text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary">
-                  {formatFileSize(filteredHistory[0].statistics.totalSize)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="i-ph:timer text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary">
-                  {(filteredHistory[0].statistics.duration / 1000).toFixed(1)}s
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="space-y-2 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-bolt-elements-borderColor scrollbar-track-transparent">
         {paginatedHistory.map((entry) => (
           <HistoryEntry
@@ -328,7 +221,11 @@ export default function SyncStats() {
             entry={entry}
             expanded={expandedEntries.has(entry.id)}
             onToggle={() => toggleExpand(entry.id)}
-            formatters={{ size: formatFileSize, time: formatDistanceToNow }}
+            formatters={{
+              size: formatFileSize,
+              time: (date: number | Date) =>
+                formatDistanceToNow(typeof date === 'number' ? date : date.getTime(), { addSuffix: true }),
+            }}
           />
         ))}
       </div>

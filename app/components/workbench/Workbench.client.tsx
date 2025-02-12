@@ -18,6 +18,7 @@ import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
 import useViewport from '~/lib/hooks';
 import Tooltip from '~/components/ui/Tooltip';
+import { PushToGitHubDialog } from '~/components/@settings/tabs/connections/components/PushToGitHubDialog';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
@@ -166,6 +167,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
   const currentSession = useStore(workbenchStore.currentSession);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [syncStats, setSyncStats] = useState<{ files: number; size: string } | null>(null);
+  const [showGitHubDialog, setShowGitHubDialog] = useState(false);
 
   const isSmallViewport = useViewport(1024);
 
@@ -456,32 +458,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                       <div className="h-4 border-l border-bolt-elements-borderColor" />
 
                       <PanelHeaderButton
-                        onClick={async () => {
-                          try {
-                            const repoName = prompt(
-                              'Please enter a name for your new GitHub repository:',
-                              'bolt-generated-project',
-                            );
-
-                            if (!repoName) {
-                              toast.error('Repository name is required');
-                              return;
-                            }
-
-                            const githubToken = prompt('Please enter your GitHub personal access token:');
-
-                            if (!githubToken) {
-                              toast.error('GitHub token is required');
-                              return;
-                            }
-
-                            toast.info('Pushing to GitHub...');
-                            await workbenchStore.pushToGitHub(repoName, githubToken);
-                          } catch (error) {
-                            console.error('Failed to push to GitHub:', error);
-                            toast.error('Failed to push to GitHub. Please check your token and try again.');
-                          }
-                        }}
+                        onClick={() => setShowGitHubDialog(true)}
                         className="text-sm flex items-center gap-1.5 text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors"
                       >
                         <div className="i-ph:github-logo" />
@@ -527,6 +504,18 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
             </div>
           </div>
         </div>
+        <PushToGitHubDialog
+          isOpen={showGitHubDialog}
+          onClose={() => setShowGitHubDialog(false)}
+          onPush={async (repoName, username, token, isPrivate) => {
+            try {
+              return await workbenchStore.pushToGitHub(repoName, undefined, username, token, isPrivate);
+            } catch (error) {
+              console.error('Failed to push to GitHub:', error);
+              throw error;
+            }
+          }}
+        />
       </motion.div>
     )
   );
