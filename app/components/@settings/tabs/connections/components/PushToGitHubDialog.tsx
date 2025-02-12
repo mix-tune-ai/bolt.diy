@@ -1,19 +1,21 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useState, useEffect } from 'react';
-import { Input } from '~/components/ui/Input';
-import { Switch } from '@radix-ui/react-switch';
-import { classNames } from '~/utils/classNames';
 import { toast } from 'react-toastify';
 import { motion } from 'framer-motion';
 import { getLocalStorage } from '~/lib/persistence';
+import { classNames } from '~/utils/classNames';
 import type { GitHubUserResponse } from '~/types/GitHub';
+import { logStore } from '~/lib/stores/logs';
 import { workbenchStore } from '~/lib/stores/workbench';
+import { extractRelativePath } from '~/utils/diff';
 import { formatSize } from '~/utils/formatSize';
+import type { FileMap, File } from '~/lib/stores/files';
+import { Octokit } from '@octokit/rest';
 
 interface PushToGitHubDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onPush: (repoName: string, username: string, token: string, isPrivate: boolean) => Promise<string | void>;
+  onPush: (repoName: string, username?: string, token?: string, isPrivate?: boolean) => Promise<string>;
 }
 
 interface GitHubRepo {
@@ -29,15 +31,8 @@ interface GitHubRepo {
   private: boolean;
 }
 
-interface FileContent {
-  path: string;
-  content: string | undefined;
-}
-
 export function PushToGitHubDialog({ isOpen, onClose, onPush }: PushToGitHubDialogProps) {
   const [repoName, setRepoName] = useState('');
-  const [username, setUsername] = useState('');
-  const [token, setToken] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [user, setUser] = useState<GitHubUserResponse | null>(null);
@@ -46,34 +41,6 @@ export function PushToGitHubDialog({ isOpen, onClose, onPush }: PushToGitHubDial
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdRepoUrl, setCreatedRepoUrl] = useState('');
   const [pushedFiles, setPushedFiles] = useState<{ path: string; size: number }[]>([]);
-  const [syncOverview, setSyncOverview] = useState<{
-    totalFiles: number;
-    totalSize: number;
-    files: { path: string; size: number }[];
-  }>({ totalFiles: 0, totalSize: 0, files: [] });
-  const [showOverwriteWarning, setShowOverwriteWarning] = useState(false);
-  const [pendingPush, setPendingPush] = useState<{
-    repoName: string;
-    username: string;
-    token: string;
-    isPrivate: boolean;
-  } | null>(null);
-
-  const resetDialogState = () => {
-    setRepoName('');
-    setIsPrivate(false);
-    setIsLoading(false);
-    setShowSuccessDialog(false);
-    setCreatedRepoUrl('');
-    setPushedFiles([]);
-    setShowOverwriteWarning(false);
-    setPendingPush(null);
-  };
-
-  const handleClose = () => {
-    resetDialogState();
-    onClose();
-  };
 
   // Load GitHub connection on mount
   useEffect(() => {
@@ -82,94 +49,66 @@ export function PushToGitHubDialog({ isOpen, onClose, onPush }: PushToGitHubDial
 
       if (connection?.user && connection?.token) {
         setUser(connection.user);
-        setUsername(connection.user.login);
-        setToken(connection.token);
 
         // Only fetch if we have both user and token
         if (connection.token.trim()) {
           fetchRecentRepos(connection.token);
         }
       }
-
-      // Get sync overview
-      const filesMap = workbenchStore.files.get();
-      const filesList = Object.entries(filesMap).map(([path, file]) => ({
-        path,
-        content: file && 'content' in file ? file.content : undefined,
-      })) as FileContent[];
-
-      const overview = {
-        totalFiles: filesList.length,
-        totalSize: filesList.reduce((sum, file) => {
-          if (!file.content) {
-            return sum;
-          }
-
-          return sum + new TextEncoder().encode(file.content).length;
-        }, 0),
-        files: filesList
-          .filter((file): file is FileContent & { content: string } => !!file.content)
-          .map((file) => ({
-            path: file.path,
-            size: new TextEncoder().encode(file.content).length,
-          })),
-      };
-
-      setSyncOverview(overview);
     }
   }, [isOpen]);
 
   const fetchRecentRepos = async (token: string) => {
     if (!token) {
-      toast.error('Please provide a GitHub token');
+      logStore.logError('No GitHub token available');
+      toast.error('GitHub authentication required');
+
       return;
     }
 
-    setIsFetchingRepos(true);
-
     try {
-      // First validate the token by checking the user endpoint
-      const userResponse = await fetch('https://api.github.com/user', {
-        headers: {
-          Authorization: `token ${token}`,
-          Accept: 'application/vnd.github.v3+json',
-        },
-      });
+      setIsFetchingRepos(true);
 
-      if (!userResponse.ok) {
-        // If token is invalid, clear it and notify user
-        setToken('');
-        throw new Error(`Failed to validate token: ${userResponse.statusText}`);
-      }
-
-      // Now fetch repositories
-      const reposResponse = await fetch(
+      const response = await fetch(
         'https://api.github.com/user/repos?sort=updated&per_page=5&type=all&affiliation=owner,organization_member',
         {
           headers: {
-            Authorization: `token ${token}`,
             Accept: 'application/vnd.github.v3+json',
+            Authorization: `Bearer ${token.trim()}`,
           },
         },
       );
 
-      if (!reposResponse.ok) {
-        throw new Error(`Failed to fetch repositories: ${reposResponse.statusText}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+
+        if (response.status === 401) {
+          toast.error('GitHub token expired. Please reconnect your account.');
+
+          // Clear invalid token
+          const connection = getLocalStorage('github_connection');
+
+          if (connection) {
+            localStorage.removeItem('github_connection');
+            setUser(null);
+          }
+        } else {
+          logStore.logError('Failed to fetch GitHub repositories', {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorData,
+          });
+          toast.error(`Failed to fetch repositories: ${response.statusText}`);
+        }
+
+        return;
       }
 
-      const repos = (await reposResponse.json()) as GitHubRepo[];
+      const repos = (await response.json()) as GitHubRepo[];
       setRecentRepos(repos);
     } catch (error) {
-      console.error('Failed to fetch GitHub repositories:', error);
-
-      if (error instanceof Error) {
-        toast.error(error.message);
-      } else {
-        toast.error('Failed to fetch repositories');
-      }
-
-      // Clear repos to prevent showing stale data
-      setRecentRepos([]);
+      logStore.logError('Failed to fetch GitHub repositories', { error });
+      toast.error('Failed to fetch recent repositories');
     } finally {
       setIsFetchingRepos(false);
     }
@@ -178,165 +117,75 @@ export function PushToGitHubDialog({ isOpen, onClose, onPush }: PushToGitHubDial
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!repoName || !username || !token) {
-      toast.error('Please fill in all required fields');
+    const connection = getLocalStorage('github_connection');
+
+    if (!connection?.token || !connection?.user) {
+      toast.error('Please connect your GitHub account in Settings > Connections first');
       return;
     }
 
-    // Check if repository exists
-    try {
-      const response = await fetch(`https://api.github.com/repos/${username}/${repoName}`, {
-        headers: {
-          Authorization: `token ${token}`,
-          Accept: 'application/vnd.github.v3+json',
-        },
-      });
-
-      if (response.status === 200) {
-        // Repository exists, show warning
-        setPendingPush({ repoName, username, token, isPrivate });
-        setShowOverwriteWarning(true);
-
-        return;
-      } else if (response.status !== 404) {
-        // Some other error occurred
-        const errorData = (await response.json().catch(() => ({}))) as { message?: string };
-        throw new Error(errorData.message || 'Failed to check repository');
-      }
-    } catch (error) {
-      console.error('Failed to check repository:', error);
-      toast.error('Failed to check if repository exists');
-
+    if (!repoName.trim()) {
+      toast.error('Repository name is required');
       return;
     }
 
-    // Repository doesn't exist, proceed with push
-    await executePush(repoName, username, token, isPrivate);
-  };
-
-  const executePush = async (repoName: string, username: string, token: string, isPrivate: boolean) => {
     setIsLoading(true);
 
     try {
-      const result = await onPush(repoName, username, token, isPrivate);
+      // Check if repository exists first
+      const octokit = new Octokit({ auth: connection.token });
 
-      if (result) {
-        // Set the repository URL for the success dialog
-        const repoUrl = result;
-        setCreatedRepoUrl(repoUrl);
+      try {
+        await octokit.repos.get({
+          owner: connection.user.login,
+          repo: repoName,
+        });
 
-        // Set the pushed files for the success dialog
-        setPushedFiles(syncOverview.files);
+        // If we get here, the repo exists
+        const confirmOverwrite = window.confirm(
+          `Repository "${repoName}" already exists. Do you want to update it? This will add or modify files in the repository.`,
+        );
 
-        // Show the success dialog
-        setShowSuccessDialog(true);
-      }
-    } catch (error) {
-      console.error('Failed to push to GitHub:', error);
-
-      if (error instanceof Error) {
-        // Check for specific error types
-        if (error.message.includes('already exists')) {
-          toast.error('Repository already exists. Please choose a different name.');
-        } else if (error.message.includes('Bad credentials')) {
-          toast.error('Invalid GitHub token. Please check your credentials.');
-        } else {
-          toast.error(`Failed to push to GitHub: ${error.message}`);
+        if (!confirmOverwrite) {
+          setIsLoading(false);
+          return;
         }
-      } else {
-        toast.error('Failed to push to GitHub. Please try again.');
+      } catch (error) {
+        // 404 means repo doesn't exist, which is what we want for new repos
+        if (error instanceof Error && 'status' in error && error.status !== 404) {
+          throw error;
+        }
       }
+
+      const repoUrl = await onPush(repoName, connection.user.login, connection.token, isPrivate);
+      setCreatedRepoUrl(repoUrl);
+
+      // Get list of pushed files
+      const files = workbenchStore.files.get();
+      const filesList = Object.entries(files as FileMap)
+        .filter(([, dirent]) => dirent?.type === 'file' && !dirent.isBinary)
+        .map(([path, dirent]) => ({
+          path: extractRelativePath(path),
+          size: new TextEncoder().encode((dirent as File).content || '').length,
+        }));
+
+      setPushedFiles(filesList);
+      setShowSuccessDialog(true);
+    } catch (error) {
+      console.error('Error pushing to GitHub:', error);
+      toast.error('Failed to push to GitHub. Please check your repository name and try again.');
     } finally {
       setIsLoading(false);
-      setPendingPush(null);
     }
   };
 
-  // Overwrite Warning Dialog
-  if (showOverwriteWarning && pendingPush) {
-    return (
-      <Dialog.Root open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9999]" />
-          <div className="fixed inset-0 flex items-center justify-center z-[9999]">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="w-[90vw] md:w-[500px]"
-            >
-              <Dialog.Content className="bg-white dark:bg-[#1E1E1E] rounded-lg border border-[#E5E5E5] dark:border-[#333333] shadow-xl">
-                <div className="p-6 space-y-4">
-                  <div className="flex items-center gap-2 text-amber-500">
-                    <div className="i-ph:warning w-5 h-5" />
-                    <h3 className="text-lg font-medium">Repository Already Exists</h3>
-                  </div>
-
-                  <p className="text-sm text-bolt-elements-textSecondary">
-                    The repository{' '}
-                    <code className="px-1 py-0.5 rounded bg-bolt-elements-background-depth-3">
-                      {pendingPush.repoName}
-                    </code>{' '}
-                    already exists. Pushing to this repository will overwrite any existing files. Are you sure you want
-                    to continue?
-                  </p>
-
-                  <div className="bg-bolt-elements-background-depth-2 dark:bg-bolt-elements-background-depth-3 rounded-lg p-3">
-                    <p className="text-xs text-bolt-elements-textSecondary mb-2">
-                      Files to be pushed ({syncOverview.files.length})
-                    </p>
-                    <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
-                      {syncOverview.files.map((file) => (
-                        <div
-                          key={file.path}
-                          className="flex items-center justify-between py-1 text-sm text-bolt-elements-textPrimary"
-                        >
-                          <span className="font-mono truncate flex-1">{file.path}</span>
-                          <span className="text-xs text-bolt-elements-textSecondary ml-2">{formatSize(file.size)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex justify-end gap-2 pt-2">
-                    <motion.button
-                      onClick={() => {
-                        setShowOverwriteWarning(false);
-                        setPendingPush(null);
-                      }}
-                      className="px-4 py-2 rounded-lg bg-[#F5F5F5] dark:bg-[#1A1A1A] text-gray-600 dark:text-gray-400 hover:bg-[#E5E5E5] dark:hover:bg-[#252525] text-sm"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      Cancel
-                    </motion.button>
-                    <motion.button
-                      onClick={() => {
-                        setShowOverwriteWarning(false);
-                        executePush(
-                          pendingPush.repoName,
-                          pendingPush.username,
-                          pendingPush.token,
-                          pendingPush.isPrivate,
-                        );
-                      }}
-                      className="px-4 py-2 rounded-lg bg-amber-500 text-white hover:bg-amber-600 text-sm inline-flex items-center gap-2"
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                    >
-                      <div className="i-ph:warning w-4 h-4" />
-                      Yes, Overwrite Files
-                    </motion.button>
-                  </div>
-                </div>
-              </Dialog.Content>
-            </motion.div>
-          </div>
-        </Dialog.Portal>
-      </Dialog.Root>
-    );
-  }
+  const handleClose = () => {
+    setRepoName('');
+    setIsPrivate(false);
+    setShowSuccessDialog(false);
+    setCreatedRepoUrl('');
+    onClose();
+  };
 
   // Success Dialog
   if (showSuccessDialog) {
@@ -505,7 +354,7 @@ export function PushToGitHubDialog({ isOpen, onClose, onPush }: PushToGitHubDial
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="w-[90vw] md:w-[600px]"
+            className="w-[90vw] md:w-[500px]"
           >
             <Dialog.Content className="bg-white dark:bg-[#0A0A0A] rounded-lg border border-[#E5E5E5] dark:border-[#1A1A1A] shadow-xl">
               <div className="p-6">
@@ -534,7 +383,6 @@ export function PushToGitHubDialog({ isOpen, onClose, onPush }: PushToGitHubDial
                   </Dialog.Close>
                 </div>
 
-                {/* GitHub User Info */}
                 <div className="flex items-center gap-3 mb-6 p-3 bg-bolt-elements-background-depth-2 dark:bg-bolt-elements-background-depth-3 rounded-lg">
                   <img src={user.avatar_url} alt={user.login} className="w-10 h-10 rounded-full" />
                   <div>
@@ -543,53 +391,19 @@ export function PushToGitHubDialog({ isOpen, onClose, onPush }: PushToGitHubDial
                   </div>
                 </div>
 
-                {/* Sync Overview */}
-                <div className="mb-6 p-4 bg-bolt-elements-background-depth-2 dark:bg-bolt-elements-background-depth-3 rounded-lg">
-                  <h4 className="text-sm font-medium text-bolt-elements-textPrimary mb-2">Files to Push</h4>
-                  <div className="flex items-center justify-between text-sm text-bolt-elements-textSecondary mb-3">
-                    <span>{syncOverview.totalFiles} files</span>
-                    <span>{formatSize(syncOverview.totalSize)}</span>
-                  </div>
-                  <div className="max-h-[200px] overflow-y-auto custom-scrollbar">
-                    {syncOverview.files.map((file) => (
-                      <div
-                        key={file.path}
-                        className="flex items-center justify-between py-1 text-sm text-bolt-elements-textPrimary"
-                      >
-                        <span className="font-mono truncate flex-1">{file.path}</span>
-                        <span className="text-xs text-bolt-elements-textSecondary ml-2">{formatSize(file.size)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="space-y-2">
                     <label htmlFor="repoName" className="text-sm text-gray-600 dark:text-gray-400">
                       Repository Name
                     </label>
-                    <Input
+                    <input
                       id="repoName"
+                      type="text"
                       value={repoName}
                       onChange={(e) => setRepoName(e.target.value)}
-                      placeholder="e.g., my-awesome-project"
+                      placeholder="my-awesome-project"
+                      className="w-full px-4 py-2 rounded-lg bg-bolt-elements-background-depth-2 dark:bg-bolt-elements-background-depth-3 border border-[#E5E5E5] dark:border-[#1A1A1A] text-gray-900 dark:text-white placeholder-gray-400"
                       required
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between">
-                    <label htmlFor="private" className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                      Private Repository
-                    </label>
-                    <Switch
-                      id="private"
-                      checked={isPrivate}
-                      onCheckedChange={setIsPrivate}
-                      className={classNames(
-                        'relative inline-flex h-5 w-9 items-center rounded-full',
-                        'transition-colors duration-200',
-                        isPrivate ? 'bg-purple-500' : 'bg-bolt-elements-background-depth-4',
-                      )}
                     />
                   </div>
 
@@ -656,6 +470,19 @@ export function PushToGitHubDialog({ isOpen, onClose, onPush }: PushToGitHubDial
                       Loading repositories...
                     </div>
                   )}
+
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="private"
+                      checked={isPrivate}
+                      onChange={(e) => setIsPrivate(e.target.checked)}
+                      className="rounded border-[#E5E5E5] dark:border-[#1A1A1A] text-purple-500 focus:ring-purple-500 dark:bg-[#0A0A0A]"
+                    />
+                    <label htmlFor="private" className="text-sm text-gray-600 dark:text-gray-400">
+                      Make repository private
+                    </label>
+                  </div>
 
                   <div className="pt-4 flex gap-2">
                     <motion.button

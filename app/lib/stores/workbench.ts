@@ -78,8 +78,6 @@ export class WorkbenchStore {
   #isInitializing = false;
   #lastSyncTimestamp = 0;
 
-  readonly isSyncing = atom<boolean>(false);
-
   isSyncEnabled = computed([this.currentSession, this.syncSettings], (session, settings) => {
     if (!session?.projectName) {
       return settings.defaultSyncEnabled;
@@ -509,7 +507,7 @@ export class WorkbenchStore {
     saveAs(content, `${uniqueProjectName}.zip`);
   }
 
-  async syncFiles() {
+  async syncFiles(): Promise<void> {
     const now = Date.now();
 
     // Prevent syncs that are too close together (within 500ms)
@@ -758,14 +756,6 @@ export class WorkbenchStore {
       toast.error('Failed to sync files');
       throw error;
     }
-  }
-
-  private _calculateTotalSize(session?: SyncSession | null): number {
-    if (!session?.statistics?.length) {
-      return 0;
-    }
-
-    return session.statistics[0].totalSize;
   }
 
   async pushToGitHub(
@@ -1425,6 +1415,25 @@ export class WorkbenchStore {
     }
 
     return { projectInfo: null, baseProjectName: normalizedName };
+  }
+
+  private _calculateTotalSize(session: SyncSession | null): string {
+    if (!session?.statistics?.length) {
+      return '0 B';
+    }
+
+    const lastStats = session.statistics[session.statistics.length - 1];
+    const bytes = lastStats.totalSize;
+
+    if (bytes === 0) {
+      return '0 B';
+    }
+
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   }
 
   async toggleProjectSync(enabled: boolean) {

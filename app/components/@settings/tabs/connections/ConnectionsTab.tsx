@@ -106,8 +106,7 @@ export default function ConnectionsTab() {
         'https://api.github.com/user/repos?sort=updated&per_page=10&affiliation=owner,organization_member,collaborator',
         {
           headers: {
-            Authorization: `token ${token}`,
-            Accept: 'application/vnd.github.v3+json',
+            Authorization: `Bearer ${token}`,
           },
         },
       );
@@ -121,8 +120,7 @@ export default function ConnectionsTab() {
       // Fetch organizations
       const orgsResponse = await fetch('https://api.github.com/user/orgs', {
         headers: {
-          Authorization: `token ${token}`,
-          Accept: 'application/vnd.github.v3+json',
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -135,8 +133,7 @@ export default function ConnectionsTab() {
       // Fetch recent activity
       const eventsResponse = await fetch('https://api.github.com/users/' + connection.user?.login + '/events/public', {
         headers: {
-          Authorization: `token ${token}`,
-          Accept: 'application/vnd.github.v3+json',
+          Authorization: `Bearer ${token}`,
         },
       });
 
@@ -150,8 +147,7 @@ export default function ConnectionsTab() {
       const languagePromises = repos.map((repo) =>
         fetch(repo.languages_url, {
           headers: {
-            Authorization: `token ${token}`,
-            Accept: 'application/vnd.github.v3+json',
+            Authorization: `Bearer ${token}`,
           },
         }).then((res) => res.json() as Promise<Record<string, number>>),
       );
@@ -196,8 +192,7 @@ export default function ConnectionsTab() {
 
       const response = await fetch('https://api.github.com/user', {
         headers: {
-          Authorization: `token ${token}`,
-          Accept: 'application/vnd.github.v3+json',
+          Authorization: `Bearer ${token}`,
         },
       });
 
