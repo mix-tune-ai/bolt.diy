@@ -4,9 +4,9 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import SyncStats from './SyncStats';
 import { classNames } from '~/utils/classNames';
-import { IconButton } from '~/components/ui/IconButton';
 import { SyncStatusIndicator } from './SyncStatusIndicator';
 import { BiSync } from 'react-icons/bi';
+import { toast } from 'react-toastify';
 
 export default function SyncTab() {
   const syncFolder = useStore(workbenchStore.syncFolder);
@@ -15,8 +15,11 @@ export default function SyncTab() {
   const syncStatus = useStore(workbenchStore.syncStatus);
   const [isManualSyncing, setIsManualSyncing] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
-  const [totalFiles, setTotalFiles] = useState(0);
-  const [totalSize, setTotalSize] = useState(0);
+  const [folderStats, setFolderStats] = useState<{ files: number; size: number; lastModified: number }>({
+    files: 0,
+    size: 0,
+    lastModified: 0,
+  });
 
   const handleSelectFolder = async () => {
     try {
@@ -55,6 +58,23 @@ export default function SyncTab() {
       ...syncSettings,
       ...settings,
     });
+
+    // Add toast notifications for different settings
+    if ('defaultSyncEnabled' in settings) {
+      toast.success(`New projects will ${settings.defaultSyncEnabled ? 'be synced' : 'not be synced'} by default`);
+    }
+
+    if ('autoSync' in settings) {
+      toast.success(`Automatic sync ${settings.autoSync ? 'enabled' : 'disabled'}`);
+    }
+
+    if ('autoSyncInterval' in settings) {
+      toast.success(`Auto-sync interval set to ${settings.autoSyncInterval} minutes`);
+    }
+
+    if ('syncOnSave' in settings) {
+      toast.success(`Sync on save ${settings.syncOnSave ? 'enabled' : 'disabled'}`);
+    }
   };
 
   const updateLastSyncTime = useCallback(() => {
@@ -90,8 +110,11 @@ export default function SyncTab() {
   const updateSyncStats = useCallback(() => {
     if (currentSession?.statistics?.length) {
       const latest = currentSession.statistics[currentSession.statistics.length - 1];
-      setTotalFiles(latest.totalFiles);
-      setTotalSize(latest.totalSize);
+      setFolderStats({
+        files: latest.totalFiles,
+        size: latest.totalSize,
+        lastModified: Date.now(), // Use current timestamp since statistics don't include lastModified
+      });
     }
   }, [currentSession?.statistics]);
 
@@ -113,6 +136,56 @@ export default function SyncTab() {
     return () => clearInterval(interval);
   }, [currentSession?.lastSync, updateLastSyncTime]);
 
+  // Add a function to scan folder and get accurate stats
+  const updateFolderStats = useCallback(async () => {
+    if (!syncFolder) {
+      return;
+    }
+
+    try {
+      let totalFiles = 0;
+      let totalSize = 0;
+      let lastModified = 0;
+
+      // Function to recursively process files in a directory
+      const processDirectory = async (dirHandle: FileSystemDirectoryHandle) => {
+        for await (const entry of dirHandle.values()) {
+          if (entry.kind === 'file') {
+            const fileHandle = entry as FileSystemFileHandle;
+            const file = await fileHandle.getFile();
+            totalFiles++;
+            totalSize += file.size;
+            lastModified = Math.max(lastModified, file.lastModified);
+          } else if (entry.kind === 'directory') {
+            const dirHandle = entry as FileSystemDirectoryHandle;
+            await processDirectory(dirHandle);
+          }
+        }
+      };
+
+      await processDirectory(syncFolder);
+      setFolderStats({ files: totalFiles, size: totalSize, lastModified });
+
+      // Update UI with accurate stats
+    } catch (error) {
+      console.error('Error scanning folder:', error);
+      toast.error('Failed to scan folder for statistics');
+    }
+  }, [syncFolder]);
+
+  // Update folder stats when folder changes or periodically
+  useEffect(() => {
+    if (!syncFolder) {
+      return undefined;
+    }
+
+    updateFolderStats();
+
+    const interval = setInterval(updateFolderStats, 30000); // Update every 30 seconds
+
+    return () => clearInterval(interval);
+  }, [syncFolder, updateFolderStats]);
+
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) {
       return '0 B';
@@ -128,7 +201,7 @@ export default function SyncTab() {
   return (
     <motion.div
       className={classNames(
-        'rounded-lg shadow-sm p-4',
+        'rounded-lg shadow-sm p-4 relative',
         'bg-bolt-elements-background text-bolt-elements-textPrimary',
         'border border-bolt-elements-borderColor',
         'hover:bg-bolt-elements-background-depth-2',
@@ -140,6 +213,9 @@ export default function SyncTab() {
       role="region"
       aria-label="Sync Configuration"
     >
+      <span className="absolute top-4 right-4 px-2 py-0.5 text-xs font-medium text-purple-500 bg-purple-500/10 rounded-md">
+        BETA
+      </span>
       <div className="space-y-6">
         {/* Header section */}
         <div className="flex items-center justify-between gap-4 border-b border-bolt-elements-borderColor pb-4">
@@ -157,7 +233,12 @@ export default function SyncTab() {
               <BiSync className="w-6 h-6" />
             </motion.div>
             <div>
-              <h2 className="text-lg font-semibold text-bolt-elements-textPrimary">File Synchronization</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold text-bolt-elements-textPrimary">File Synchronization</h2>
+                <span className="px-2 py-0.5 text-xs rounded-md bg-purple-500/10 text-purple-500 font-medium">
+                  BETA
+                </span>
+              </div>
               <p className="text-sm text-bolt-elements-textSecondary">Configure and manage your file sync settings</p>
             </div>
           </div>
@@ -176,46 +257,50 @@ export default function SyncTab() {
           animate={{ opacity: 1, y: 0 }}
           whileHover={{ scale: 1.01 }}
         >
-          <div className="flex flex-col gap-4">
-            {/* Header and Status */}
-            <div className="flex items-center justify-between">
-              <div className="flex-1">
-                <h3 className="text-md font-semibold text-bolt-elements-textPrimary group-hover:text-purple-500 transition-colors">
-                  Sync Controls
-                </h3>
-                <div className="mt-1.5 flex items-center gap-3">
-                  {syncFolder && lastSyncTime && (
-                    <div className="text-sm text-bolt-elements-textSecondary flex items-center gap-2">
-                      <div className="i-ph:clock-duotone text-bolt-elements-textPrimary" />
-                      Last synced {lastSyncTime}
-                    </div>
-                  )}
-                </div>
+          <h3 className="text-md font-semibold text-bolt-elements-textPrimary mb-4">Sync Controls</h3>
+          <div className="space-y-4">
+            {/* Status and Actions */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-bolt-elements-background-depth-3 border border-bolt-elements-borderColor">
+              <div>
+                <div className="text-sm font-medium text-bolt-elements-textPrimary">Sync Status</div>
+                {syncFolder && lastSyncTime && (
+                  <div className="text-xs text-bolt-elements-textSecondary mt-0.5 flex items-center gap-2">
+                    <div className="i-ph:clock-duotone text-bolt-elements-textPrimary" />
+                    Last synced {lastSyncTime}
+                  </div>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <motion.div
                   className={classNames(
-                    'flex items-center gap-2 px-3 py-1.5 rounded-md border transition-colors cursor-default',
+                    'flex items-center gap-2 px-3 py-1.5 rounded-lg',
                     'bg-bolt-elements-background-depth-3',
-                    'border-bolt-elements-borderColor',
+                    'text-bolt-elements-textSecondary',
+                    'border border-bolt-elements-borderColor/50',
+                    'transition-all duration-200',
                   )}
                   whileHover={{ scale: 1.02 }}
                 >
                   <SyncStatusIndicator status={isManualSyncing ? 'syncing' : !syncStatus.isReady ? 'error' : 'idle'} />
+                  <span className="text-sm">Idle</span>
                 </motion.div>
                 <motion.button
                   onClick={handleSelectFolder}
                   className={classNames(
-                    'text-sm px-3 py-1.5',
-                    'bg-bolt-elements-background-depth-3 hover:bg-bolt-elements-background-depth-4',
+                    'text-sm px-4 py-1.5',
+                    'bg-bolt-elements-background-depth-3',
+                    'hover:bg-bolt-elements-background-depth-4',
                     'text-bolt-elements-textPrimary',
-                    'border border-bolt-elements-borderColor',
-                    'transition-all rounded-md flex items-center gap-1.5',
+                    'border border-bolt-elements-borderColor/50',
+                    'hover:border-bolt-elements-borderColor',
+                    'transition-all duration-200 rounded-lg',
+                    'flex items-center gap-2',
+                    'shadow-sm hover:shadow-md',
                   )}
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >
-                  <div className="i-ph:folder-simple-plus-duotone" />
+                  <div className="i-ph:folder-simple-plus-duotone text-purple-500" />
                   {syncFolder ? 'Change Main Folder' : 'Set Main Folder'}
                 </motion.button>
                 {syncFolder && (
@@ -224,11 +309,14 @@ export default function SyncTab() {
                     disabled={isManualSyncing}
                     aria-label={isManualSyncing ? 'Sync in progress...' : 'Manually sync files now'}
                     className={classNames(
-                      'text-sm px-3 py-1.5',
+                      'text-sm px-4 py-1.5',
                       'bg-purple-500 hover:bg-purple-600',
-                      'text-white',
+                      'text-white font-medium',
                       'disabled:opacity-50 disabled:cursor-not-allowed',
-                      'transition-all rounded-md flex items-center gap-1.5',
+                      'transition-all duration-200 rounded-lg',
+                      'flex items-center gap-2',
+                      'shadow-sm hover:shadow-md',
+                      'border border-purple-400 hover:border-purple-500',
                     )}
                     whileHover={{ scale: 1.02 }}
                     whileTap={{ scale: 0.98 }}
@@ -243,7 +331,7 @@ export default function SyncTab() {
             {/* Sync Settings Indicators */}
             {(syncSettings.autoSync || syncSettings.syncOnSave) && (
               <motion.div
-                className="flex items-center gap-4 p-3 rounded-md bg-bolt-elements-background-depth-3 border border-bolt-elements-borderColor"
+                className="flex items-center gap-4 p-3 rounded-lg bg-bolt-elements-background-depth-3 border border-bolt-elements-borderColor"
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
@@ -264,7 +352,7 @@ export default function SyncTab() {
             )}
 
             {/* Folders */}
-            <div className="grid gap-3">
+            <div className="space-y-3">
               {/* Main Sync Folder */}
               <div className="flex items-center gap-4 p-3 rounded-lg bg-bolt-elements-background-depth-3 border border-bolt-elements-borderColor">
                 <div className="flex-1 min-w-0">
@@ -273,7 +361,14 @@ export default function SyncTab() {
                     <div className="flex flex-col gap-0.5">
                       <span className="text-xs font-medium text-bolt-elements-textSecondary">Main Sync Folder</span>
                       {syncFolder ? (
-                        <span className="truncate font-medium text-bolt-elements-textPrimary">{syncFolder.name}</span>
+                        <>
+                          <span className="truncate font-medium text-bolt-elements-textPrimary">{syncFolder.name}</span>
+                          {folderStats.lastModified > 0 && (
+                            <span className="text-xs text-bolt-elements-textSecondary">
+                              Last modified: {new Date(folderStats.lastModified).toLocaleString()}
+                            </span>
+                          )}
+                        </>
                       ) : (
                         <span className="text-bolt-elements-textSecondary italic">No folder selected</span>
                       )}
@@ -284,12 +379,21 @@ export default function SyncTab() {
                   <div className="flex items-center gap-4 text-sm text-bolt-elements-textSecondary border-l border-bolt-elements-borderColor pl-4">
                     <div className="flex items-center gap-2">
                       <div className="i-ph:files-duotone" />
-                      <span>{totalFiles} files</span>
+                      <span>{folderStats.files.toLocaleString()} files</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="i-ph:database-duotone" />
-                      <span>{formatFileSize(totalSize)}</span>
+                      <span>{formatFileSize(folderStats.size)}</span>
                     </div>
+                    <motion.button
+                      onClick={updateFolderStats}
+                      className="text-bolt-elements-textSecondary hover:text-purple-500 transition-colors"
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
+                      title="Refresh folder statistics"
+                    >
+                      <div className="i-ph:arrows-clockwise-duotone w-4 h-4" />
+                    </motion.button>
                   </div>
                 )}
               </div>
@@ -347,17 +451,21 @@ export default function SyncTab() {
                       Choose whether new projects should be synced by default
                     </div>
                   </div>
-                  <IconButton
+                  <motion.button
                     onClick={() => handleSaveSettings({ defaultSyncEnabled: !syncSettings.defaultSyncEnabled })}
                     className={classNames(
-                      'text-xl transition-colors',
-                      syncSettings.defaultSyncEnabled
-                        ? 'text-green-400 hover:text-green-500'
-                        : 'text-bolt-elements-textPrimary dark:text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary dark:hover:text-bolt-elements-textSecondary',
+                      'relative w-11 h-6 rounded-full transition-colors duration-200',
+                      syncSettings.defaultSyncEnabled ? 'bg-purple-500' : 'bg-bolt-elements-background-depth-4',
                     )}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
                   >
-                    <div className={syncSettings.defaultSyncEnabled ? 'i-ph:check-square-fill' : 'i-ph:square'} />
-                  </IconButton>
+                    <motion.div
+                      className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white"
+                      animate={{ x: syncSettings.defaultSyncEnabled ? 20 : 0 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    />
+                  </motion.button>
                 </div>
 
                 {/* Project Sync Control */}
@@ -371,7 +479,7 @@ export default function SyncTab() {
                         Enable or disable sync for this specific project
                       </div>
                     </div>
-                    <IconButton
+                    <motion.button
                       onClick={() => {
                         const projectName = currentSession.projectName;
 
@@ -388,37 +496,57 @@ export default function SyncTab() {
                         workbenchStore.toggleProjectSync(!projectInfo.syncEnabled);
                       }}
                       className={classNames(
-                        'text-xl transition-colors',
+                        'relative w-11 h-6 rounded-full transition-colors duration-200',
                         ((currentSession.projectName &&
                           syncSettings.projectFolders[currentSession.projectName]?.syncEnabled) ??
                           syncSettings.defaultSyncEnabled)
-                          ? 'text-green-400 hover:text-green-500'
-                          : 'text-bolt-elements-textPrimary dark:text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary dark:hover:text-bolt-elements-textSecondary',
+                          ? 'bg-purple-500'
+                          : 'bg-bolt-elements-background-depth-4',
                       )}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
                     >
-                      <div
-                        className={
-                          ((currentSession.projectName &&
-                            syncSettings.projectFolders[currentSession.projectName]?.syncEnabled) ??
-                          syncSettings.defaultSyncEnabled)
-                            ? 'i-ph:check-square-fill'
-                            : 'i-ph:square'
-                        }
+                      <motion.div
+                        className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white"
+                        animate={{
+                          x:
+                            ((currentSession.projectName &&
+                              syncSettings.projectFolders[currentSession.projectName]?.syncEnabled) ??
+                            syncSettings.defaultSyncEnabled)
+                              ? 20
+                              : 0,
+                        }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
                       />
-                    </IconButton>
+                    </motion.button>
                   </div>
                 )}
 
                 {/* Auto-sync settings */}
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={syncSettings.autoSync}
-                    onChange={(e) => handleSaveSettings({ autoSync: e.target.checked })}
-                    className="checkbox"
-                  />
-                  <div className="text-sm text-bolt-elements-textSecondary">Enable automatic sync</div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-bolt-elements-background-depth-3">
+                  <div>
+                    <div className="text-sm font-medium text-bolt-elements-textPrimary">Enable automatic sync</div>
+                    <div className="text-xs text-bolt-elements-textSecondary mt-0.5">
+                      Automatically sync files at regular intervals
+                    </div>
+                  </div>
+                  <motion.button
+                    onClick={() => handleSaveSettings({ autoSync: !syncSettings.autoSync })}
+                    className={classNames(
+                      'relative w-11 h-6 rounded-full transition-colors duration-200',
+                      syncSettings.autoSync ? 'bg-purple-500' : 'bg-bolt-elements-background-depth-4',
+                    )}
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <motion.div
+                      className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white"
+                      animate={{ x: syncSettings.autoSync ? 20 : 0 }}
+                      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                    />
+                  </motion.button>
                 </div>
+
                 {syncSettings.autoSync && (
                   <div className="flex items-center gap-2 pl-6">
                     <div className="text-sm text-bolt-elements-textSecondary">Sync every</div>
@@ -437,6 +565,7 @@ export default function SyncTab() {
                         'bg-bolt-elements-background-depth-3',
                         'text-bolt-elements-textPrimary',
                         'border border-bolt-elements-borderColor',
+                        'focus:outline-none focus:ring-2 focus:ring-purple-500/20',
                       )}
                     />
                     <div className="text-sm text-bolt-elements-textSecondary">minutes</div>
@@ -454,17 +583,21 @@ export default function SyncTab() {
                     Automatically sync files when saved
                   </div>
                 </div>
-                <IconButton
+                <motion.button
                   onClick={() => handleSaveSettings({ syncOnSave: !syncSettings.syncOnSave })}
                   className={classNames(
-                    'text-xl transition-colors',
-                    syncSettings.syncOnSave
-                      ? 'text-green-400 hover:text-green-500'
-                      : 'text-bolt-elements-textPrimary dark:text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary dark:hover:text-bolt-elements-textSecondary',
+                    'relative w-11 h-6 rounded-full transition-colors duration-200',
+                    syncSettings.syncOnSave ? 'bg-purple-500' : 'bg-bolt-elements-background-depth-4',
                   )}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  <div className={syncSettings.syncOnSave ? 'i-ph:check-square-fill' : 'i-ph:square'} />
-                </IconButton>
+                  <motion.div
+                    className="absolute left-1 top-1 w-4 h-4 rounded-full bg-white"
+                    animate={{ x: syncSettings.syncOnSave ? 20 : 0 }}
+                    transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                  />
+                </motion.button>
               </div>
             </div>
           </div>

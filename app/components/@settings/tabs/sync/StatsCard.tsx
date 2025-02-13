@@ -1,48 +1,80 @@
 import { classNames } from '~/utils/classNames';
+import { motion } from 'framer-motion';
+import { Progress } from '~/components/ui/Progress';
 
 interface StatsCardProps {
   icon: string;
   label: string;
   value: string | number;
-  _color?: string;
   trend?: {
     value: number;
     label: string;
+    progress?: number;
   };
 }
 
-export default function StatsCard({ icon, label, value, _color = 'blue', trend }: StatsCardProps) {
+export default function StatsCard({ icon, label, value, trend }: StatsCardProps) {
   return (
-    <div
+    <motion.div
       className={classNames(
-        'p-4 rounded-lg border',
-        'bg-bolt-elements-background-depth-4',
-        'border-bolt-elements-borderColor/10',
+        'p-5 rounded-xl',
+        'bg-bolt-elements-background-depth-2',
+        'hover:bg-bolt-elements-background-depth-3',
+        'border border-bolt-elements-borderColor/10',
+        'transition-all duration-200',
+        'group',
       )}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      whileHover={{ scale: 1.02 }}
     >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className={classNames('text-2xl text-bolt-elements-textTertiary', icon)} />
-          <div>
-            <div className="text-sm text-bolt-elements-textSecondary">{label}</div>
-            <div className="text-lg font-medium text-bolt-elements-textPrimary">{value}</div>
-          </div>
-        </div>
-        {trend && (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
           <div
-            className={classNames('flex items-center gap-1 text-sm', {
-              'text-green-500': trend.value > 0,
-              'text-red-500': trend.value < 0,
-              'text-bolt-elements-textTertiary': trend.value === 0,
-            })}
-          >
-            {trend.value > 0 && <div className="i-ph:trend-up-duotone" />}
-            {trend.value < 0 && <div className="i-ph:trend-down-duotone" />}
-            {trend.value === 0 && <div className="i-ph:minus-duotone" />}
-            <span>{trend.label}</span>
-          </div>
-        )}
+            className={classNames(
+              'w-8 h-8 flex items-center justify-center rounded-lg',
+              'bg-purple-500/10 text-purple-500',
+              'group-hover:bg-purple-500/20',
+              'transition-colors duration-200',
+              icon,
+            )}
+          />
+          {trend && (
+            <motion.div
+              className={classNames(
+                'flex flex-col items-end gap-1',
+                trend.value > 0
+                  ? 'text-purple-500'
+                  : trend.value < 0
+                    ? 'text-red-500'
+                    : 'text-bolt-elements-textTertiary',
+              )}
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium bg-bolt-elements-background-depth-3">
+                <div className="i-ph:sliders-horizontal w-3.5 h-3.5" />
+                <span>{trend.label}</span>
+              </div>
+              {trend.progress !== undefined && (
+                <Progress
+                  value={trend.progress}
+                  className={classNames('h-1 w-16', {
+                    'bg-purple-500/10 [&>div]:bg-purple-500': trend.value >= 0,
+                    'bg-red-500/10 [&>div]:bg-red-500': trend.value < 0,
+                  })}
+                />
+              )}
+            </motion.div>
+          )}
+        </div>
+
+        <div>
+          <div className="text-2xl font-semibold text-bolt-elements-textPrimary mb-1">{value}</div>
+          <div className="text-sm text-bolt-elements-textSecondary">{label}</div>
+        </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

@@ -6,9 +6,12 @@ import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'react-toastify';
 import { IconButton } from '~/components/ui/IconButton';
 import { classNames } from '~/utils/classNames';
+import { formatFileSize } from '~/utils/fileUtils';
 import StatsCard from './StatsCard';
 import TimeRangeSelector from './TimeRangeSelector';
 import HistoryEntry from './HistoryEntry';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Progress } from '~/components/ui/Progress';
 
 const timeRangeOptions = [
   { value: '24h' as TimeRange, label: 'Last 24h' },
@@ -142,18 +145,6 @@ export default function SyncStats() {
     });
   }, []);
 
-  const formatFileSize = useCallback((bytes: number) => {
-    if (bytes === 0) {
-      return '0 B';
-    }
-
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
-  }, []);
-
   const getFilteredHistory = useCallback(() => {
     const now = Date.now();
 
@@ -189,9 +180,11 @@ export default function SyncStats() {
 
       const change = ((current - previous) / previous) * 100;
       const value = Math.abs(Math.round(change));
+      const progress = Math.min(100, Math.abs(change));
 
       return {
         value,
+        progress,
         label: `${value}% ${change >= 0 ? 'increase' : 'decrease'}`,
       };
     };
@@ -217,11 +210,92 @@ export default function SyncStats() {
 
   if (!syncHistory.length) {
     return (
-      <div className="bg-bolt-elements-background-depth-1 p-6 rounded-lg text-center">
-        <div className="i-ph:cloud-slash text-4xl text-gray-400 mx-auto mb-4" />
-        <div className="text-lg font-medium mb-2">No Sync History</div>
-        <div className="text-sm text-gray-400">Start syncing your files to see statistics here</div>
-      </div>
+      <motion.div
+        className={classNames(
+          'rounded-lg bg-bolt-elements-background text-bolt-elements-textPrimary shadow-sm p-4',
+          'hover:bg-bolt-elements-background-depth-2',
+          'transition-all duration-200',
+        )}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <div className="space-y-6">
+          {/* Header section */}
+          <div className="flex items-center justify-between gap-4 border-b border-bolt-elements-borderColor pb-4">
+            <div className="flex items-center gap-3">
+              <motion.div
+                className={classNames(
+                  'w-10 h-10 flex items-center justify-center rounded-xl',
+                  'bg-purple-500/10 text-purple-500',
+                )}
+                whileHover={{ scale: 1.05 }}
+              >
+                <div className="i-ph:sliders-horizontal w-6 h-6" />
+              </motion.div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-lg font-semibold text-bolt-elements-textPrimary">No Sync History</h2>
+                </div>
+                <p className="text-sm text-bolt-elements-textSecondary">
+                  Start syncing your files to see statistics here
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick start guide */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <motion.div
+              className={classNames(
+                'p-4 rounded-xl',
+                'bg-bolt-elements-background-depth-2',
+                'hover:bg-bolt-elements-background-depth-3',
+                'transition-all duration-200',
+              )}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="i-ph:folder-simple-plus text-purple-500 w-5 h-5" />
+                <h3 className="text-sm font-medium text-bolt-elements-textPrimary">Create Project</h3>
+              </div>
+              <p className="text-xs text-bolt-elements-textSecondary">Create a new project or open an existing one</p>
+            </motion.div>
+
+            <motion.div
+              className={classNames(
+                'p-4 rounded-xl',
+                'bg-bolt-elements-background-depth-2',
+                'hover:bg-bolt-elements-background-depth-3',
+                'transition-all duration-200',
+              )}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="i-ph:git-branch text-purple-500 w-5 h-5" />
+                <h3 className="text-sm font-medium text-bolt-elements-textPrimary">Connect Repository</h3>
+              </div>
+              <p className="text-xs text-bolt-elements-textSecondary">Link your project to a Git repository</p>
+            </motion.div>
+
+            <motion.div
+              className={classNames(
+                'p-4 rounded-xl',
+                'bg-bolt-elements-background-depth-2',
+                'hover:bg-bolt-elements-background-depth-3',
+                'transition-all duration-200',
+              )}
+              whileHover={{ scale: 1.02 }}
+            >
+              <div className="flex items-center gap-3 mb-2">
+                <div className="i-ph:cloud-arrow-up text-purple-500 w-5 h-5" />
+                <h3 className="text-sm font-medium text-bolt-elements-textPrimary">Start Syncing</h3>
+              </div>
+              <p className="text-xs text-bolt-elements-textSecondary">Begin syncing your files automatically</p>
+            </motion.div>
+          </div>
+        </div>
+      </motion.div>
     );
   }
 
@@ -229,131 +303,205 @@ export default function SyncStats() {
   const totalPages = Math.ceil(filteredHistory.length / ITEMS_PER_PAGE);
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h3 className="text-lg font-medium text-bolt-elements-textPrimary">Sync History</h3>
-          <TimeRangeSelector
-            value={selectedTimeRange}
-            onChange={(value: TimeRange) => setSelectedTimeRange(value)}
-            options={timeRangeOptions}
-          />
-        </div>
-        <IconButton
-          onClick={handleClearHistory}
-          disabled={isClearing}
-          className={classNames('text-bolt-elements-textSecondary hover:text-red-400 transition-colors', {
-            'opacity-50 cursor-not-allowed': isClearing,
-          })}
-          title="Clear History"
-        >
-          <div className={classNames('i-ph:trash', { 'animate-pulse': isClearing })} />
-        </IconButton>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatsCard icon="i-ph:list-numbers" label="Total Syncs" value={totalSyncs} _color="blue" trend={trends.syncs} />
-        <StatsCard
-          icon="i-ph:files"
-          label="Files Synced"
-          value={totalFilesSynced}
-          _color="purple"
-          trend={trends.files}
-        />
-        <StatsCard
-          icon="i-ph:database"
-          label="Data Synced"
-          value={formatFileSize(totalDataSynced)}
-          _color="green"
-          trend={trends.data}
-        />
-        <StatsCard
-          icon="i-ph:timer"
-          label="Average Duration"
-          value={`${averageDuration.toFixed(1)}s`}
-          _color="orange"
-          trend={trends.duration}
-        />
-      </div>
-
-      {filteredHistory.length > 0 && (
-        <div className="bg-bolt-elements-background-depth-3 p-3 rounded-lg border border-bolt-elements-borderColor/10">
-          <h4 className="text-sm font-medium mb-3 flex items-center gap-2 text-bolt-elements-textPrimary">
-            <div className="i-ph:clock-clockwise text-blue-400" />
-            Latest Sync
-          </h4>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+    <motion.div
+      className={classNames(
+        'rounded-lg bg-bolt-elements-background text-bolt-elements-textPrimary shadow-sm p-4',
+        'hover:bg-bolt-elements-background-depth-2',
+        'transition-all duration-200',
+      )}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="space-y-6">
+        {/* Header section */}
+        <div className="flex items-center justify-between gap-4 border-b border-bolt-elements-borderColor pb-4">
+          <div className="flex items-center gap-3">
+            <motion.div
+              className={classNames(
+                'w-10 h-10 flex items-center justify-center rounded-xl',
+                'bg-purple-500/10 text-purple-500',
+              )}
+              whileHover={{ scale: 1.05 }}
+            >
+              <div className="i-ph:sliders-horizontal w-6 h-6" />
+            </motion.div>
+            <div>
               <div className="flex items-center gap-2">
-                <div className="i-ph:folder text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary truncate">
-                  {filteredHistory[0].projectName}
+                <h2 className="text-lg font-semibold text-bolt-elements-textPrimary">Sync History</h2>
+                <span className="px-2 py-0.5 text-xs rounded-full bg-purple-500/10 text-purple-500">
+                  {totalSyncs} syncs
                 </span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="i-ph:clock text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary">
-                  {formatDistanceToNow(filteredHistory[0].timestamp)} ago
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="i-ph:files text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary">
-                  {filteredHistory[0].statistics.totalFiles} files
-                </span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <div className="i-ph:database text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary">
-                  {formatFileSize(filteredHistory[0].statistics.totalSize)}
-                </span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="i-ph:timer text-bolt-elements-textTertiary" />
-                <span className="text-sm text-bolt-elements-textPrimary">
-                  {(filteredHistory[0].statistics.duration / 1000).toFixed(1)}s
-                </span>
-              </div>
+              <p className="text-sm text-bolt-elements-textSecondary">Track and manage your file synchronization</p>
             </div>
           </div>
-        </div>
-      )}
 
-      <div className="space-y-2 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-bolt-elements-borderColor scrollbar-track-transparent">
-        {paginatedHistory.map((entry) => (
-          <HistoryEntry
-            key={entry.id}
-            entry={entry}
-            expanded={expandedEntries.has(entry.id)}
-            onToggle={() => toggleExpand(entry.id)}
-            formatters={{ size: formatFileSize, time: formatDistanceToNow }}
+          <div className="flex items-center gap-4">
+            <TimeRangeSelector
+              value={selectedTimeRange}
+              onChange={(value: TimeRange) => setSelectedTimeRange(value)}
+              options={timeRangeOptions}
+            />
+            <IconButton
+              onClick={handleClearHistory}
+              disabled={isClearing}
+              className={classNames(
+                'text-bolt-elements-textSecondary transition-theme',
+                'hover:text-red-400',
+                'bg-bolt-elements-background-depth-2 hover:bg-bolt-elements-background-depth-3',
+                'p-2 rounded-lg',
+                { 'opacity-50 cursor-not-allowed': isClearing },
+              )}
+              title="Clear History"
+            >
+              <div className={classNames('i-ph:trash w-4 h-4', { 'animate-pulse': isClearing })} />
+            </IconButton>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <StatsCard icon="i-ph:sliders-horizontal" label="Total Syncs" value={totalSyncs} trend={trends.syncs} />
+          <StatsCard icon="i-ph:files" label="Files Synced" value={totalFilesSynced} trend={trends.files} />
+          <StatsCard
+            icon="i-ph:database"
+            label="Data Synced"
+            value={formatFileSize(totalDataSynced)}
+            trend={trends.data}
           />
-        ))}
-      </div>
-
-      {totalPages > 1 && (
-        <div className="flex items-center justify-center gap-2 mt-4">
-          <IconButton
-            onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={page === 1}
-            className="text-bolt-elements-textSecondary disabled:opacity-50"
-          >
-            <div className="i-ph:caret-left" />
-          </IconButton>
-          <span className="text-sm text-bolt-elements-textSecondary">
-            Page {page} of {totalPages}
-          </span>
-          <IconButton
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-            className="text-bolt-elements-textSecondary disabled:opacity-50"
-          >
-            <div className="i-ph:caret-right" />
-          </IconButton>
+          <StatsCard
+            icon="i-ph:timer"
+            label="Average Duration"
+            value={`${averageDuration.toFixed(1)}s`}
+            trend={trends.duration}
+          />
         </div>
-      )}
-    </div>
+
+        {/* Latest Sync Overview */}
+        {filteredHistory.length > 0 && (
+          <motion.div
+            className={classNames(
+              'bg-bolt-elements-background-depth-2 rounded-xl p-5',
+              'hover:bg-bolt-elements-background-depth-3',
+              'transition-all duration-200',
+              'border border-bolt-elements-borderColor/10',
+            )}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            whileHover={{ scale: 1.01 }}
+          >
+            <h4 className="text-sm font-medium mb-4 flex items-center gap-2 text-bolt-elements-textPrimary">
+              <div className="i-ph:clock-clockwise text-purple-500" />
+              Latest Synchronization
+            </h4>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="i-ph:folder text-purple-500 w-4 h-4" />
+                  <span className="text-sm text-bolt-elements-textPrimary truncate">
+                    {filteredHistory[0].projectName}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="i-ph:clock text-purple-500 w-4 h-4" />
+                  <span className="text-sm text-bolt-elements-textPrimary">
+                    {formatDistanceToNow(filteredHistory[0].timestamp)} ago
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="i-ph:files text-purple-500 w-4 h-4" />
+                  <span className="text-sm text-bolt-elements-textPrimary">
+                    {filteredHistory[0].statistics.totalFiles} files
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <div className="i-ph:database text-purple-500 w-4 h-4" />
+                  <span className="text-sm text-bolt-elements-textPrimary">
+                    {formatFileSize(filteredHistory[0].statistics.totalSize)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="i-ph:timer text-purple-500 w-4 h-4" />
+                  <span className="text-sm text-bolt-elements-textPrimary">
+                    {(filteredHistory[0].statistics.duration / 1000).toFixed(1)}s
+                  </span>
+                </div>
+                <Progress value={100} className="h-1.5 bg-purple-500/10 [&>div]:bg-purple-500" />
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* History List */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h4 className="text-sm font-medium flex items-center gap-2 text-bolt-elements-textPrimary">
+              <div className="i-ph:list-numbers text-purple-500" />
+              Sync History
+            </h4>
+            <span className="text-xs text-bolt-elements-textSecondary">
+              Showing {paginatedHistory.length} of {filteredHistory.length} entries
+            </span>
+          </div>
+
+          <div className="space-y-2 max-h-96 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-bolt-elements-borderColor scrollbar-track-transparent">
+            <AnimatePresence>
+              {paginatedHistory.map((entry, index) => (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: 20 }}
+                  transition={{ delay: index * 0.05 }}
+                >
+                  <HistoryEntry
+                    entry={entry}
+                    expanded={expandedEntries.has(entry.id)}
+                    onToggle={() => toggleExpand(entry.id)}
+                    formatters={{ size: formatFileSize, time: formatDistanceToNow }}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 pt-4 border-t border-bolt-elements-borderColor">
+            <IconButton
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className={classNames(
+                'text-bolt-elements-textSecondary transition-theme',
+                'bg-bolt-elements-background-depth-2 hover:bg-bolt-elements-background-depth-3',
+                'p-2 rounded-lg disabled:opacity-50',
+              )}
+            >
+              <div className="i-ph:caret-left w-4 h-4" />
+            </IconButton>
+            <span className="text-sm text-bolt-elements-textSecondary">
+              Page {page} of {totalPages}
+            </span>
+            <IconButton
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className={classNames(
+                'text-bolt-elements-textSecondary transition-theme',
+                'bg-bolt-elements-background-depth-2 hover:bg-bolt-elements-background-depth-3',
+                'p-2 rounded-lg disabled:opacity-50',
+              )}
+            >
+              <div className="i-ph:caret-right w-4 h-4" />
+            </IconButton>
+          </div>
+        )}
+      </div>
+    </motion.div>
   );
 }

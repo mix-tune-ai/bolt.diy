@@ -119,6 +119,7 @@
     "react-markdown": "^9.0.1",
     "react-resizable-panels": "^2.1.7",
     "react-toastify": "^10.0.6",
+    "react-virtuoso": "^4.12.5",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
     "remark-gfm": "^4.0.0",
