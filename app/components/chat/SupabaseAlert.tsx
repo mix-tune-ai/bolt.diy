@@ -106,48 +106,38 @@ export default function SupabaseAlert({ alert, clearAlert, postMessage }: Supaba
   const [showFeaturesModal, setShowFeaturesModal] = useState(false);
 
   const integrationOptions = {
-    'Database': {
+    Database: {
       title: 'Database Features',
-      options: [
-        'Create RLS policies',
-        'Create functions',
-        'Create migration',
-        'Postgres SQL Style Guide'
-      ]
+      options: ['Create RLS policies', 'Create functions', 'Create migration', 'Postgres SQL Style Guide'],
     },
-    'Integration': {
+    Integration: {
       title: 'Integration Features',
-      options: [
-        'Bootstrap Next.js app with Supabase Auth',
-        'Writing Supabase Edge Functions'
-      ]
-    }
+      options: ['Bootstrap Next.js app with Supabase Auth', 'Writing Supabase Edge Functions'],
+    },
   };
 
   const handleSubOptionChange = (category: string, option: string, checked: boolean) => {
-    setSelectedSubOptions(prev => ({
+    setSelectedSubOptions((prev) => ({
       ...prev,
       [category]: checked
         ? [...(prev[category] || []), option]
-        : (prev[category] || []).filter(item => item !== option)
+        : (prev[category] || []).filter((item) => item !== option),
     }));
   };
 
   const handleSubmit = () => {
-    const formattedPrompt = SUPABASE_PROMPT
-      .replace('{url}', supabaseUrl)
-      .replace('{key}', supabaseKey);
-    
+    const formattedPrompt = SUPABASE_PROMPT.replace('{url}', supabaseUrl).replace('{key}', supabaseKey);
+
     const selectedFeatures = Object.entries(selectedSubOptions)
       .map(([category, options]) => ({
         category,
-        options: options.join(', ')
+        options: options.join(', '),
       }))
-      .filter(item => item.options.length > 0);
+      .filter((item) => item.options.length > 0);
 
-    const visibleMessage = `Starting integration for: ${selectedFeatures.map(f => `${f.category} (${f.options})`).join('; ')}`;
+    const visibleMessage = `Starting integration for: ${selectedFeatures.map((f) => `${f.category} (${f.options})`).join('; ')}`;
     const encodedPrompt = btoa(formattedPrompt);
-    
+
     postMessage(`${visibleMessage}\u200B${encodedPrompt}`);
     clearAlert();
   };
@@ -165,19 +155,12 @@ export default function SupabaseAlert({ alert, clearAlert, postMessage }: Supaba
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-[#2E2E2E]">
             <div className="flex items-center gap-3">
-              <img
-                src="/supabase/supabase-logo-icon.png"
-                alt="Supabase"
-                className="w-6 h-6 object-contain"
-              />
+              <img src="/supabase/supabase-logo-icon.png" alt="Supabase" className="w-6 h-6 object-contain" />
               <h3 className="text-sm font-medium text-white">
-                {expanded ? "Configure Supabase Integration" : "Supabase Integration Detected"}
+                {expanded ? 'Configure Supabase Integration' : 'Supabase Integration Detected'}
               </h3>
             </div>
-            <button
-              onClick={clearAlert}
-              className="text-gray-400 hover:text-white transition-colors"
-            >
+            <button onClick={clearAlert} className="text-gray-400 hover:text-white transition-colors">
               <div className="i-ph:x text-lg" />
             </button>
           </div>
@@ -218,9 +201,7 @@ export default function SupabaseAlert({ alert, clearAlert, postMessage }: Supaba
 
                 {/* Features Button */}
                 <div>
-                  <label className="block text-xs mb-2 text-gray-400 font-medium">
-                    Features
-                  </label>
+                  <label className="block text-xs mb-2 text-gray-400 font-medium">Features</label>
                   <button
                     onClick={() => setShowFeaturesModal(true)}
                     className="w-full px-3 py-2 text-sm rounded bg-[#2E2E2E] border border-[#404040] hover:border-[#3ECF8E] text-white flex items-center justify-between"
@@ -243,9 +224,7 @@ export default function SupabaseAlert({ alert, clearAlert, postMessage }: Supaba
                 <p className="text-white">We detected that your project needs a database.</p>
                 <p className="mt-1 text-gray-400">Would you like to integrate Supabase?</p>
                 {alert.description && (
-                  <div className="mt-3 text-xs p-2 bg-[#2E2E2E] rounded text-gray-400">
-                    {alert.description}
-                  </div>
+                  <div className="mt-3 text-xs p-2 bg-[#2E2E2E] rounded text-gray-400">{alert.description}</div>
                 )}
               </div>
             )}
@@ -297,102 +276,100 @@ export default function SupabaseAlert({ alert, clearAlert, postMessage }: Supaba
         </div>
 
         {/* Features Modal */}
-        {showFeaturesModal && createPortal(
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.2 }}
-              className="bg-[#1C1C1C] rounded-lg border border-[#2E2E2E] shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden relative"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="sticky top-0 flex items-center justify-between p-4 border-b border-[#2E2E2E] bg-[#1C1C1C] z-10">
-                <div className="flex items-center gap-3">
-                  <img
-                    src="/supabase/supabase-logo-icon.png"
-                    alt="Supabase"
-                    className="w-5 h-5 object-contain"
-                  />
-                  <h3 className="text-sm font-medium text-white">Integration Features</h3>
+        {showFeaturesModal &&
+          createPortal(
+            <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] backdrop-blur-sm">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className="bg-[#1C1C1C] rounded-lg border border-[#2E2E2E] shadow-xl w-full max-w-2xl max-h-[80vh] overflow-hidden relative"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="sticky top-0 flex items-center justify-between p-4 border-b border-[#2E2E2E] bg-[#1C1C1C] z-10">
+                  <div className="flex items-center gap-3">
+                    <img src="/supabase/supabase-logo-icon.png" alt="Supabase" className="w-5 h-5 object-contain" />
+                    <h3 className="text-sm font-medium text-white">Integration Features</h3>
+                  </div>
+                  <button
+                    onClick={() => setShowFeaturesModal(false)}
+                    className="text-gray-400 hover:text-white transition-colors"
+                  >
+                    <div className="i-ph:x text-lg" />
+                  </button>
                 </div>
-                <button
-                  onClick={() => setShowFeaturesModal(false)}
-                  className="text-gray-400 hover:text-white transition-colors"
-                >
-                  <div className="i-ph:x text-lg" />
-                </button>
-              </div>
 
-              {/* Modal Content */}
-              <div className="p-4 overflow-y-auto max-h-[calc(80vh-8rem)]">
-                <div className="grid gap-4">
-                  {Object.entries(integrationOptions).map(([category, { title, options }]) => (
-                    <div key={category} className="space-y-2">
-                      <div className="flex items-center justify-between sticky top-0 bg-[#1C1C1C] py-2 -mt-2 z-[1]">
-                        <div className="flex items-center gap-2">
-                          <div className={classNames(
-                            "text-base",
-                            {
-                              "i-ph:database-duotone": category === 'Database',
-                              "i-ph:code-duotone": category === 'Integration'
-                            }
-                          )} />
-                          <h4 className="text-sm font-medium text-white">{title}</h4>
-                        </div>
-                        <label className="flex items-center gap-2 text-xs text-gray-400 hover:text-white cursor-pointer">
-                          <span>Select All</span>
-                          <input
-                            type="checkbox"
-                            checked={options.every(opt => (selectedSubOptions[category] || []).includes(opt))}
-                            onChange={(e) => {
-                              setSelectedSubOptions(prev => ({
-                                ...prev,
-                                [category]: e.target.checked ? [...options] : []
-                              }));
-                            }}
-                            className="w-3 h-3 rounded border-[#404040] text-[#3ECF8E] focus:ring-[#3ECF8E] focus:ring-offset-0"
-                          />
-                        </label>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 pl-6">
-                        {options.map((option) => (
-                          <label
-                            key={option}
-                            className="flex items-start gap-2 text-[11px] text-gray-400 hover:text-white cursor-pointer p-1.5 rounded hover:bg-[#404040]"
-                          >
+                {/* Modal Content */}
+                <div className="p-4 overflow-y-auto max-h-[calc(80vh-8rem)]">
+                  <div className="grid gap-4">
+                    {Object.entries(integrationOptions).map(([category, { title, options }]) => (
+                      <div key={category} className="space-y-2">
+                        <div className="flex items-center justify-between sticky top-0 bg-[#1C1C1C] py-2 -mt-2 z-[1]">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className={classNames('text-base', {
+                                'i-ph:database-duotone': category === 'Database',
+                                'i-ph:code-duotone': category === 'Integration',
+                              })}
+                            />
+                            <h4 className="text-sm font-medium text-white">{title}</h4>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs text-gray-400 hover:text-white cursor-pointer">
+                            <span>Select All</span>
                             <input
                               type="checkbox"
-                              checked={(selectedSubOptions[category] || []).includes(option)}
-                              onChange={(e) => handleSubOptionChange(category, option, e.target.checked)}
-                              className="w-3 h-3 rounded border-[#404040] text-[#3ECF8E] focus:ring-[#3ECF8E] focus:ring-offset-0 mt-0.5"
+                              checked={options.every((opt) => (selectedSubOptions[category] || []).includes(opt))}
+                              onChange={(e) => {
+                                setSelectedSubOptions((prev) => ({
+                                  ...prev,
+                                  [category]: e.target.checked ? [...options] : [],
+                                }));
+                              }}
+                              className="w-3 h-3 rounded border-[#404040] text-[#3ECF8E] focus:ring-[#3ECF8E] focus:ring-offset-0"
                             />
-                            <span className="leading-tight" title={option}>{option}</span>
                           </label>
-                        ))}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pl-6">
+                          {options.map((option) => (
+                            <label
+                              key={option}
+                              className="flex items-start gap-2 text-[11px] text-gray-400 hover:text-white cursor-pointer p-1.5 rounded hover:bg-[#404040]"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={(selectedSubOptions[category] || []).includes(option)}
+                                onChange={(e) => handleSubOptionChange(category, option, e.target.checked)}
+                                className="w-3 h-3 rounded border-[#404040] text-[#3ECF8E] focus:ring-[#3ECF8E] focus:ring-offset-0 mt-0.5"
+                              />
+                              <span className="leading-tight" title={option}>
+                                {option}
+                              </span>
+                            </label>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              {/* Modal Footer */}
-              <div className="sticky bottom-0 flex justify-end gap-2 p-4 border-t border-[#2E2E2E] bg-[#1C1C1C] z-10">
-                <button
-                  onClick={() => setShowFeaturesModal(false)}
-                  className="px-4 py-2 rounded text-sm font-medium bg-[#3ECF8E] text-black hover:bg-[#3ECF8E]/90"
-                >
-                  Done
-                </button>
-              </div>
-            </motion.div>
-          </div>,
-          document.body
-        )}
+                {/* Modal Footer */}
+                <div className="sticky bottom-0 flex justify-end gap-2 p-4 border-t border-[#2E2E2E] bg-[#1C1C1C] z-10">
+                  <button
+                    onClick={() => setShowFeaturesModal(false)}
+                    className="px-4 py-2 rounded text-sm font-medium bg-[#3ECF8E] text-black hover:bg-[#3ECF8E]/90"
+                  >
+                    Done
+                  </button>
+                </div>
+              </motion.div>
+            </div>,
+            document.body,
+          )}
       </motion.div>
     </AnimatePresence>
   );
 }
 
-export { SupabaseAlert }; 
+export { SupabaseAlert };
