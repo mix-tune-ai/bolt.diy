@@ -3,7 +3,6 @@ import type { ModelInfo } from '~/lib/modules/llm/types';
 import type { IProviderSetting } from '~/types/model';
 import type { LanguageModelV1, LanguageModelV1CallOptions } from 'ai';
 
-
 export default class VertexAIProvider extends BaseProvider {
   name = 'VertexAI';
   getApiKeyLink = 'https://console.cloud.google.com/';
@@ -73,10 +72,11 @@ export default class VertexAIProvider extends BaseProvider {
     }
 
     // Get location from settings or default
-    const location = apiKeys?.GOOGLE_LOCATION || 
-                    providerSettings?.[this.name]?.location || 
-                    serverEnv?.GOOGLE_LOCATION || 
-                    'us-central1';
+    const location =
+      apiKeys?.GOOGLE_LOCATION ||
+      providerSettings?.[this.name]?.location ||
+      serverEnv?.GOOGLE_LOCATION ||
+      'us-central1';
 
     const instance: LanguageModelV1 = {
       specificationVersion: 'v1',
@@ -92,6 +92,7 @@ export default class VertexAIProvider extends BaseProvider {
                 if ('text' in part) {
                   return { text: part.text };
                 }
+
                 throw new Error(`Unsupported content type for Vertex AI`);
               })
             : [{ text: msg.content }],
@@ -157,6 +158,7 @@ export default class VertexAIProvider extends BaseProvider {
                   textDelta: response.text,
                 });
               }
+
               controller.enqueue({
                 type: 'finish',
                 finishReason: response.finishReason,

@@ -36,5 +36,5 @@ export {
   LMStudioProvider,
   AmazonBedrockProvider,
   GithubProvider,
-  VertexAIProvider
+  VertexAIProvider,
 };
