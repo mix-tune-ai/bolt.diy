@@ -54,6 +54,16 @@ export function simplifyBoltActions(input: string): string {
   });
 }
 
+export function simplifyBundledArtifacts(input: string): string {
+  // Using regex to match buldled boltArtifact tags
+  const regex = /(<boltArtifact[^>]*type="bundled"[^>]*>)([\s\S]*?)(<\/boltArtifact>)/g;
+
+  // Replace each matching occurrence
+  return input.replace(regex, (_0, _1, _2, _3) => {
+    return `[[Imported Code Files]]`;
+  });
+}
+
 export function createFilesContext(files: FileMap, useRelativePath?: boolean) {
   const ig = ignore().add(IGNORE_PATTERNS);
   let filePaths = Object.keys(files);
@@ -82,10 +92,10 @@ export function createFilesContext(files: FileMap, useRelativePath?: boolean) {
         filePath = path.replace('/home/project/', '');
       }
 
-      return `<file path="${filePath}">\n${codeWithLinesNumbers}\n</file>`;
+      return `<boltAction type="file" filePath="${filePath}">${codeWithLinesNumbers}</boltAction>`;
     });
 
-  return `<codebase>${fileContexts.join('\n\n')}\n\n</codebase>`;
+  return `<boltArtifact id="code-content" title="Code Content" >\n${fileContexts.join('\n')}\n</boltArtifact>`;
 }
 
 export function extractCurrentContext(messages: Message[]) {

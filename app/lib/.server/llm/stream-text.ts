@@ -7,12 +7,52 @@ import { PromptLibrary } from '~/lib/common/prompt-library';
 import { allowedHTMLElements } from '~/utils/markdown';
 import { LLMManager } from '~/lib/modules/llm/manager';
 import { createScopedLogger } from '~/utils/logger';
-import { createFilesContext, extractPropertiesFromMessage, simplifyBoltActions } from './utils';
+import { createFilesContext, extractPropertiesFromMessage, simplifyBundledArtifacts } from './utils';
 import { getFilePaths } from './select-context';
 
 export type Messages = Message[];
 
 export type StreamingOptions = Omit<Parameters<typeof _streamText>[0], 'model'>;
+
+export interface File {
+  type: 'file';
+  content: string;
+  isBinary: boolean;
+}
+
+export interface Folder {
+  type: 'folder';
+}
+
+export function simplifyBoltActions(input: string): string {
+  // Using regex to match boltAction tags that have type="file"
+  const regex = /(<boltAction[^>]*type="file"[^>]*>)([\s\S]*?)(<\/boltAction>)/g;
+
+  // Replace each matching occurrence
+  return input.replace(regex, (_0, openingTag, _2, closingTag) => {
+    return `// file content redacted, see the system prompt for file content\n${openingTag}${closingTag}`;
+  });
+}
+
+// Common patterns to ignore, similar to .gitignore
+// const IGNORE_PATTERNS = [
+//   'node_modules/**',
+//   '.git/**',
+//   'dist/**',
+//   'build/**',
+//   '.next/**',
+//   'coverage/**',
+//   '.cache/**',
+//   '.vscode/**',
+//   '.idea/**',
+//   '**/*.log',
+//   '**/.DS_Store',
+//   '**/npm-debug.log*',
+//   '**/yarn-debug.log*',
+//   '**/yarn-error.log*',
+//   '**/*lock.json',
+//   '**/*lock.yml',
+// ];
 
 const logger = createScopedLogger('stream-text');
 
@@ -27,6 +67,7 @@ export async function streamText(props: {
   contextOptimization?: boolean;
   contextFiles?: FileMap;
   summary?: string;
+  messageSliceId?: number;
 }) {
   const {
     messages,
@@ -51,10 +92,9 @@ export async function streamText(props: {
       return { ...message, content };
     } else if (message.role == 'assistant') {
       let content = message.content;
-
-      if (contextOptimization) {
-        content = simplifyBoltActions(content);
-      }
+      content = content.replace(/<div class=\\"__boltThought__\\">.*?<\/div>/s, '');
+      content = content.replace(/<think>.*?<\/think>/s, '');
+      content = simplifyBundledArtifacts(content);
 
       return { ...message, content };
     }
@@ -93,7 +133,7 @@ export async function streamText(props: {
 
   const dynamicMaxTokens = modelDetails && modelDetails.maxTokenAllowed ? modelDetails.maxTokenAllowed : MAX_TOKENS;
 
-  let systemPrompt =
+  const systemPrompt =
     PromptLibrary.getPropmtFromLibrary(promptId || 'default', {
       cwd: WORK_DIR,
       allowedHtmlElements: allowedHTMLElements,
@@ -104,13 +144,13 @@ export async function streamText(props: {
     const codeContext = createFilesContext(contextFiles, true);
     const filePaths = getFilePaths(files);
 
-    systemPrompt = `${systemPrompt}
+    let additionalMessage = `
 Below are all the files present in the project:
 ---
 ${filePaths.join('\n')}
 ---
 
-Below is the context loaded into context buffer for you to have knowledge of and might need changes to fullfill current user request.
+Below is the artifact containing the context loaded into context buffer for you to have knowledge of and might need changes to fullfill current user request.
 CONTEXT BUFFER:
 ---
 ${codeContext}
@@ -118,19 +158,45 @@ ${codeContext}
 `;
 
     if (summary) {
-      systemPrompt = `${systemPrompt}
-      below is the chat history till now
+      additionalMessage = `${additionalMessage}
+below is the chat history till now
 CHAT SUMMARY:
 ---
 ${props.summary}
 ---
 `;
 
-      const lastMessage = processedMessages.pop();
+      if (props.messageSliceId) {
+        processedMessages = processedMessages.slice(props.messageSliceId);
+      } else {
+        const lastMessage = processedMessages.pop();
 
-      if (lastMessage) {
-        processedMessages = [lastMessage];
+        if (lastMessage) {
+          processedMessages = [lastMessage];
+        }
       }
+
+      console.log(additionalMessage);
+
+      if (processedMessages[0].role === 'assistant') {
+        const preUserMessage: Omit<Message, 'id'> = {
+          role: 'user',
+          content: additionalMessage,
+        };
+        processedMessages = [preUserMessage, ...processedMessages];
+      } else {
+        const preUserMessage: Omit<Message, 'id'> = {
+          role: 'user',
+          content: additionalMessage,
+        };
+        const preAssistantMessage: Omit<Message, 'id'> = {
+          role: 'assistant',
+          content: 'thank you for providing the context, I am now ready to assist you with your request.',
+        };
+        processedMessages = [preUserMessage, preAssistantMessage, ...processedMessages];
+      }
+
+      // systemPrompt = `${systemPrompt}\n\n${additionalMessage}`;
     }
   }
 
