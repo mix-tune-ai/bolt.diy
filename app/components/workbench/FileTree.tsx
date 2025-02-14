@@ -137,51 +137,55 @@ export const FileTree = memo(
 
     return (
       <div className={classNames('text-sm', className, 'overflow-y-auto')}>
-        {filteredFileList.map((fileOrFolder) => {
-          switch (fileOrFolder.kind) {
-            case 'file': {
-              return (
-                <File
-                  key={fileOrFolder.id}
-                  selected={selectedFile === fileOrFolder.fullPath}
-                  file={fileOrFolder}
-                  unsavedChanges={unsavedFiles?.has(fileOrFolder.fullPath)}
-                  onCopyPath={() => {
-                    onCopyPath(fileOrFolder);
-                  }}
-                  onCopyRelativePath={() => {
-                    onCopyRelativePath(fileOrFolder);
-                  }}
-                  onClick={() => {
-                    onFileSelect?.(fileOrFolder.fullPath);
-                  }}
-                />
-              );
-            }
-            case 'folder': {
-              return (
-                <Folder
-                  key={fileOrFolder.id}
-                  folder={fileOrFolder}
-                  selected={allowFolderSelection && selectedFile === fileOrFolder.fullPath}
-                  collapsed={collapsedFolders.has(fileOrFolder.fullPath)}
-                  onCopyPath={() => {
-                    onCopyPath(fileOrFolder);
-                  }}
-                  onCopyRelativePath={() => {
-                    onCopyRelativePath(fileOrFolder);
-                  }}
-                  onClick={() => {
-                    toggleCollapseState(fileOrFolder.fullPath);
-                  }}
-                />
-              );
-            }
-            default: {
-              return undefined;
-            }
-          }
-        })}
+        <FileContextMenu onCopyPath={() => {}} onCopyRelativePath={() => {}} targetPath={rootFolder} isFolder={true}>
+          <div className="h-full w-full">
+            {filteredFileList.map((fileOrFolder) => {
+              switch (fileOrFolder.kind) {
+                case 'file': {
+                  return (
+                    <File
+                      key={fileOrFolder.id}
+                      selected={selectedFile === fileOrFolder.fullPath}
+                      file={fileOrFolder}
+                      unsavedChanges={unsavedFiles?.has(fileOrFolder.fullPath)}
+                      onCopyPath={() => {
+                        onCopyPath(fileOrFolder);
+                      }}
+                      onCopyRelativePath={() => {
+                        onCopyRelativePath(fileOrFolder);
+                      }}
+                      onClick={() => {
+                        onFileSelect?.(fileOrFolder.fullPath);
+                      }}
+                    />
+                  );
+                }
+                case 'folder': {
+                  return (
+                    <Folder
+                      key={fileOrFolder.id}
+                      folder={fileOrFolder}
+                      selected={allowFolderSelection && selectedFile === fileOrFolder.fullPath}
+                      collapsed={collapsedFolders.has(fileOrFolder.fullPath)}
+                      onCopyPath={() => {
+                        onCopyPath(fileOrFolder);
+                      }}
+                      onCopyRelativePath={() => {
+                        onCopyRelativePath(fileOrFolder);
+                      }}
+                      onClick={() => {
+                        toggleCollapseState(fileOrFolder.fullPath);
+                      }}
+                    />
+                  );
+                }
+                default: {
+                  return undefined;
+                }
+              }
+            })}
+          </div>
+        </FileContextMenu>
       </div>
     );
   },
@@ -203,6 +207,7 @@ interface FolderContextMenuProps {
   onCopyRelativePath?: () => void;
   children: ReactNode;
   targetPath?: string;
+  isFolder?: boolean;
 }
 
 function ContextMenuItem({ onSelect, children }: { onSelect?: () => void; children: ReactNode }) {
@@ -217,7 +222,7 @@ function ContextMenuItem({ onSelect, children }: { onSelect?: () => void; childr
   );
 }
 
-function FileContextMenu({ onCopyPath, onCopyRelativePath, children, targetPath }: FolderContextMenuProps) {
+function FileContextMenu({ onCopyPath, onCopyRelativePath, children, targetPath, isFolder }: FolderContextMenuProps) {
   const handleUploadFiles = async (event: Event) => {
     const input = event.target as HTMLInputElement;
     const files = input.files;
@@ -320,17 +325,19 @@ ${file.content}
           <ContextMenu.Group className="p-1 border-b-px border-solid border-bolt-elements-borderColor">
             <ContextMenuItem onSelect={onCopyPath}>Copy path</ContextMenuItem>
             <ContextMenuItem onSelect={onCopyRelativePath}>Copy relative path</ContextMenuItem>
-            <ContextMenuItem
-              onSelect={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.multiple = true;
-                input.onchange = handleUploadFiles;
-                input.click();
-              }}
-            >
-              Upload files
-            </ContextMenuItem>
+            {isFolder && (
+              <ContextMenuItem
+                onSelect={() => {
+                  const input = document.createElement('input');
+                  input.type = 'file';
+                  input.multiple = true;
+                  input.onchange = handleUploadFiles;
+                  input.click();
+                }}
+              >
+                Upload files
+              </ContextMenuItem>
+            )}
           </ContextMenu.Group>
         </ContextMenu.Content>
       </ContextMenu.Portal>
@@ -340,7 +347,12 @@ ${file.content}
 
 function Folder({ folder, collapsed, selected = false, onCopyPath, onCopyRelativePath, onClick }: FolderProps) {
   return (
-    <FileContextMenu onCopyPath={onCopyPath} onCopyRelativePath={onCopyRelativePath} targetPath={folder.fullPath}>
+    <FileContextMenu
+      onCopyPath={onCopyPath}
+      onCopyRelativePath={onCopyRelativePath}
+      targetPath={folder.fullPath}
+      isFolder={true}
+    >
       <NodeButton
         className={classNames('group', {
           'bg-transparent text-bolt-elements-item-contentDefault hover:text-bolt-elements-item-contentActive hover:bg-bolt-elements-item-backgroundActive':
@@ -382,6 +394,7 @@ function File({
       onCopyPath={onCopyPath}
       onCopyRelativePath={onCopyRelativePath}
       targetPath={path.dirname(fullPath)}
+      isFolder={false}
     >
       <NodeButton
         className={classNames('group', {
