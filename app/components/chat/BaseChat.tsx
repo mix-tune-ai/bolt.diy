@@ -261,19 +261,40 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
       const input = document.createElement('input');
       input.type = 'file';
       input.accept = 'image/*';
+      input.multiple = true;
 
       input.onchange = async (e) => {
-        const file = (e.target as HTMLInputElement).files?.[0];
+        const files = (e.target as HTMLInputElement).files;
 
-        if (file) {
-          const reader = new FileReader();
+        if (!files) {
+          return;
+        }
 
-          reader.onload = (e) => {
-            const base64Image = e.target?.result as string;
-            setUploadedFiles?.([...uploadedFiles, file]);
-            setImageDataList?.([...imageDataList, base64Image]);
-          };
-          reader.readAsDataURL(file);
+        const newFiles: File[] = [];
+        const newImageData: string[] = [];
+
+        for (const file of Array.from(files)) {
+          if (file.type.startsWith('image/')) {
+            try {
+              const base64Image = await new Promise<string>((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target?.result as string);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+              });
+
+              newFiles.push(file);
+              newImageData.push(base64Image);
+            } catch (error) {
+              console.error('Failed to read file:', error);
+              toast.error(`Failed to read ${file.name}`);
+            }
+          }
+        }
+
+        if (newFiles.length > 0) {
+          setUploadedFiles?.([...uploadedFiles, ...newFiles]);
+          setImageDataList?.([...imageDataList, ...newImageData]);
         }
       };
 
@@ -287,25 +308,39 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         return;
       }
 
-      for (const item of items) {
+      const newFiles: File[] = [];
+      const newImageData: string[] = [];
+
+      for (const item of Array.from(items)) {
         if (item.type.startsWith('image/')) {
           e.preventDefault();
 
           const file = item.getAsFile();
 
-          if (file) {
-            const reader = new FileReader();
-
-            reader.onload = (e) => {
-              const base64Image = e.target?.result as string;
-              setUploadedFiles?.([...uploadedFiles, file]);
-              setImageDataList?.([...imageDataList, base64Image]);
-            };
-            reader.readAsDataURL(file);
+          if (!file) {
+            continue;
           }
 
-          break;
+          try {
+            const base64Image = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.onerror = reject;
+              reader.readAsDataURL(file);
+            });
+
+            newFiles.push(file);
+            newImageData.push(base64Image);
+          } catch (error) {
+            console.error('Failed to read pasted file:', error);
+            toast.error('Failed to read pasted image');
+          }
         }
+      }
+
+      if (newFiles.length > 0) {
+        setUploadedFiles?.([...uploadedFiles, ...newFiles]);
+        setImageDataList?.([...imageDataList, ...newImageData]);
       }
     };
 
@@ -506,19 +541,39 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                         e.preventDefault();
                         e.currentTarget.style.border = '1px solid var(--bolt-elements-borderColor)';
 
-                        const files = Array.from(e.dataTransfer.files);
-                        files.forEach((file) => {
-                          if (file.type.startsWith('image/')) {
-                            const reader = new FileReader();
+                        const newFiles: File[] = [];
+                        const newImageData: string[] = [];
 
-                            reader.onload = (e) => {
-                              const base64Image = e.target?.result as string;
-                              setUploadedFiles?.([...uploadedFiles, file]);
-                              setImageDataList?.([...imageDataList, base64Image]);
-                            };
-                            reader.readAsDataURL(file);
+                        const processFile = async (file: File) => {
+                          if (file.type.startsWith('image/')) {
+                            try {
+                              const base64Image = await new Promise<string>((resolve, reject) => {
+                                const reader = new FileReader();
+                                reader.onload = (e) => resolve(e.target?.result as string);
+                                reader.onerror = reject;
+                                reader.readAsDataURL(file);
+                              });
+
+                              newFiles.push(file);
+                              newImageData.push(base64Image);
+                            } catch (error) {
+                              console.error('Failed to read dropped file:', error);
+                              toast.error(`Failed to read ${file.name}`);
+                            }
                           }
-                        });
+                        };
+
+                        Promise.all(Array.from(e.dataTransfer.files).map(processFile))
+                          .then(() => {
+                            if (newFiles.length > 0) {
+                              setUploadedFiles?.([...uploadedFiles, ...newFiles]);
+                              setImageDataList?.([...imageDataList, ...newImageData]);
+                            }
+                          })
+                          .catch((error) => {
+                            console.error('Failed to process dropped files:', error);
+                            toast.error('Failed to process some dropped files');
+                          });
                       }}
                       onKeyDown={(event) => {
                         if (event.key === 'Enter') {
