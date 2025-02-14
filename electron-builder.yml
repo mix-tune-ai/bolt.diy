@@ -30,7 +30,7 @@ mac:
   gatekeeperAssess: false
   entitlements: entitlements.mac.plist
   entitlementsInherit: entitlements.mac.plist
-  identity: 'Developer ID Application: Your Name (TEAM_ID)'
+  # identity: 'Developer ID Application: Your Name (TEAM_ID)'
 
 win:
   icon: icons/icon.ico
