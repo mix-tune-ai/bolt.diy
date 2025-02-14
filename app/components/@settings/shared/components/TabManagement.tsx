@@ -25,7 +25,6 @@ const TAB_ICONS: Record<TabType, string> = {
   update: 'i-ph:arrow-clockwise-fill',
   'task-manager': 'i-ph:chart-line-fill',
   'tab-management': 'i-ph:squares-four-fill',
-  sync: 'i-ph:arrows-clockwise-fill',
 };
 
 // Define which tabs are default in user mode
@@ -40,21 +39,13 @@ const DEFAULT_USER_TABS: TabType[] = [
 ];
 
 // Define which tabs can be added to user mode
-const OPTIONAL_USER_TABS: TabType[] = [
-  'profile',
-  'settings',
-  'task-manager',
-  'service-status',
-  'debug',
-  'update',
-  'sync',
-];
+const OPTIONAL_USER_TABS: TabType[] = ['profile', 'settings', 'task-manager', 'service-status', 'debug', 'update'];
 
 // All available tabs for user mode
 const ALL_USER_TABS = [...DEFAULT_USER_TABS, ...OPTIONAL_USER_TABS];
 
 // Define which tabs are beta
-const BETA_TABS = new Set<TabType>(['task-manager', 'service-status', 'update', 'local-providers', 'sync']);
+const BETA_TABS = new Set<TabType>(['task-manager', 'service-status', 'update', 'local-providers']);
 
 // Beta label component
 const BetaLabel = () => (

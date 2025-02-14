@@ -13,8 +13,17 @@ import {
   setMessages,
   duplicateChat,
   createChatFromMessages,
+  type IChatMetadata,
 } from './db';
-import { type IChatMetadata } from '~/types/chat';
+
+export interface ChatHistoryItem {
+  id: string;
+  urlId?: string;
+  description?: string;
+  messages: Message[];
+  timestamp: string;
+  metadata?: IChatMetadata;
+}
 
 const persistenceEnabled = !import.meta.env.VITE_DISABLE_PERSISTENCE;
 

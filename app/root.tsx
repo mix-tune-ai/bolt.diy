@@ -8,7 +8,6 @@ import { createHead } from 'remix-island';
 import { useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
-import { SyncProvider } from './components/sync/SyncProvider';
 
 import reactToastifyStyles from 'react-toastify/dist/ReactToastify.css?url';
 import globalStyles from './styles/index.scss?url';
@@ -74,11 +73,9 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
   return (
     <DndProvider backend={HTML5Backend}>
-      <SyncProvider>
-        {children}
-        <ScrollRestoration />
-        <Scripts />
-      </SyncProvider>
+      {children}
+      <ScrollRestoration />
+      <Scripts />
     </DndProvider>
   );
 }

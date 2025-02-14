@@ -1,22 +1,19 @@
 import type { Message } from 'ai';
 import { createScopedLogger } from '~/utils/logger';
-import type { ChatHistoryItem, IChatMetadata } from '~/types/chat';
+import type { ChatHistoryItem } from './useChatHistory';
+
+export interface IChatMetadata {
+  gitUrl: string;
+  gitBranch?: string;
+}
 
 const logger = createScopedLogger('ChatHistory');
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 100; // ms
-
-let dbInstance: IDBDatabase | undefined;
 
 // this is used at the top level and never rejects
 export async function openDatabase(): Promise<IDBDatabase | undefined> {
   if (typeof indexedDB === 'undefined') {
     console.error('indexedDB is not available in this environment.');
     return undefined;
-  }
-
-  if (dbInstance) {
-    return dbInstance;
   }
 
   return new Promise((resolve) => {
@@ -33,20 +30,7 @@ export async function openDatabase(): Promise<IDBDatabase | undefined> {
     };
 
     request.onsuccess = (event: Event) => {
-      dbInstance = (event.target as IDBOpenDBRequest).result;
-
-      // Handle connection closing
-      dbInstance.onclose = () => {
-        dbInstance = undefined;
-      };
-
-      // Handle version change
-      dbInstance.onversionchange = () => {
-        dbInstance?.close();
-        dbInstance = undefined;
-      };
-
-      resolve(dbInstance);
+      resolve((event.target as IDBOpenDBRequest).result);
     };
 
     request.onerror = (event: Event) => {
@@ -56,44 +40,15 @@ export async function openDatabase(): Promise<IDBDatabase | undefined> {
   });
 }
 
-async function withRetry<T>(operation: () => Promise<T>): Promise<T> {
-  let lastError;
-
-  for (let i = 0; i < MAX_RETRIES; i++) {
-    try {
-      // If database is closed, try to reopen it
-      if (!dbInstance) {
-        await openDatabase();
-      }
-
-      return await operation();
-    } catch (error) {
-      lastError = error;
-
-      if (error instanceof Error && error.name === 'InvalidStateError') {
-        dbInstance = undefined;
-        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY));
-        continue;
-      }
-
-      throw error;
-    }
-  }
-  throw lastError;
-}
-
 export async function getAll(db: IDBDatabase): Promise<ChatHistoryItem[]> {
-  return withRetry(
-    () =>
-      new Promise((resolve, reject) => {
-        const transaction = db.transaction('chats', 'readonly');
-        const store = transaction.objectStore('chats');
-        const request = store.getAll();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction('chats', 'readonly');
+    const store = transaction.objectStore('chats');
+    const request = store.getAll();
 
-        request.onsuccess = () => resolve(request.result as ChatHistoryItem[]);
-        request.onerror = () => reject(request.error);
-      }),
-  );
+    request.onsuccess = () => resolve(request.result as ChatHistoryItem[]);
+    request.onerror = () => reject(request.error);
+  });
 }
 
 export async function setMessages(
@@ -105,30 +60,27 @@ export async function setMessages(
   timestamp?: string,
   metadata?: IChatMetadata,
 ): Promise<void> {
-  return withRetry(
-    () =>
-      new Promise((resolve, reject) => {
-        const transaction = db.transaction('chats', 'readwrite');
-        const store = transaction.objectStore('chats');
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction('chats', 'readwrite');
+    const store = transaction.objectStore('chats');
 
-        if (timestamp && isNaN(Date.parse(timestamp))) {
-          reject(new Error('Invalid timestamp'));
-          return;
-        }
+    if (timestamp && isNaN(Date.parse(timestamp))) {
+      reject(new Error('Invalid timestamp'));
+      return;
+    }
 
-        const request = store.put({
-          id,
-          messages,
-          urlId,
-          description,
-          timestamp: timestamp ?? new Date().toISOString(),
-          metadata,
-        });
+    const request = store.put({
+      id,
+      messages,
+      urlId,
+      description,
+      timestamp: timestamp ?? new Date().toISOString(),
+      metadata,
+    });
 
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      }),
-  );
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
 }
 
 export async function getMessages(db: IDBDatabase, id: string): Promise<ChatHistoryItem> {
@@ -242,12 +194,7 @@ export async function forkChat(db: IDBDatabase, chatId: string, messageId: strin
   // Get messages up to and including the selected message
   const messages = chat.messages.slice(0, messageIndex + 1);
 
-  return createChatFromMessages(
-    db,
-    chat.description ? `${chat.description} (fork)` : 'Forked chat',
-    messages,
-    chat.metadata,
-  );
+  return createChatFromMessages(db, chat.description ? `${chat.description} (fork)` : 'Forked chat', messages);
 }
 
 export async function duplicateChat(db: IDBDatabase, id: string): Promise<string> {
@@ -257,7 +204,7 @@ export async function duplicateChat(db: IDBDatabase, id: string): Promise<string
     throw new Error('Chat not found');
   }
 
-  return createChatFromMessages(db, `${chat.description || 'Chat'} (copy)`, chat.messages, chat.metadata);
+  return createChatFromMessages(db, `${chat.description || 'Chat'} (copy)`, chat.messages);
 }
 
 export async function createChatFromMessages(
@@ -275,7 +222,7 @@ export async function createChatFromMessages(
     messages,
     newUrlId, // Use the new urlId
     description,
-    undefined,
+    undefined, // Use the current timestamp
     metadata,
   );
 
@@ -293,5 +240,19 @@ export async function updateChatDescription(db: IDBDatabase, id: string, descrip
     throw new Error('Description cannot be empty');
   }
 
-  await setMessages(db, id, chat.messages, chat.urlId, description, chat.timestamp);
+  await setMessages(db, id, chat.messages, chat.urlId, description, chat.timestamp, chat.metadata);
+}
+
+export async function updateChatMetadata(
+  db: IDBDatabase,
+  id: string,
+  metadata: IChatMetadata | undefined,
+): Promise<void> {
+  const chat = await getMessages(db, id);
+
+  if (!chat) {
+    throw new Error('Chat not found');
+  }
+
+  await setMessages(db, id, chat.messages, chat.urlId, chat.description, chat.timestamp, metadata);
 }

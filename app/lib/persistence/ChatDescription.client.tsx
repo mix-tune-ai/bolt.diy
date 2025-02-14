@@ -1,7 +1,8 @@
 import { useStore } from '@nanostores/react';
+import { TooltipProvider } from '@radix-ui/react-tooltip';
+import WithTooltip from '~/components/ui/Tooltip';
 import { useEditChatDescription } from '~/lib/hooks';
 import { description as descriptionStore } from '~/lib/persistence';
-import Tooltip from '~/components/ui/Tooltip';
 
 export function ChatDescription() {
   const initialDescription = useStore(descriptionStore)!;
@@ -31,27 +32,35 @@ export function ChatDescription() {
             onKeyDown={handleKeyDown}
             style={{ width: `${Math.max(currentDescription.length * 8, 100)}px` }}
           />
-          <Tooltip content="Save description">
-            <button
-              type="submit"
-              className="i-ph:check-bold scale-110 hover:text-bolt-elements-item-contentAccent"
-              onMouseDown={handleSubmit}
-            />
-          </Tooltip>
+          <TooltipProvider>
+            <WithTooltip tooltip="Save title">
+              <div className="flex justify-between items-center p-2 rounded-md bg-bolt-elements-item-backgroundAccent">
+                <button
+                  type="submit"
+                  className="i-ph:check-bold scale-110 hover:text-bolt-elements-item-contentAccent"
+                  onMouseDown={handleSubmit}
+                />
+              </div>
+            </WithTooltip>
+          </TooltipProvider>
         </form>
       ) : (
         <>
           {currentDescription}
-          <Tooltip content="Edit description">
-            <button
-              type="button"
-              className="i-ph:pencil-fill scale-110 hover:text-bolt-elements-item-contentAccent"
-              onClick={(event) => {
-                event.preventDefault();
-                toggleEditMode();
-              }}
-            />
-          </Tooltip>
+          <TooltipProvider>
+            <WithTooltip tooltip="Rename chat">
+              <div className="flex justify-between items-center p-2 rounded-md bg-bolt-elements-item-backgroundAccent ml-2">
+                <button
+                  type="button"
+                  className="i-ph:pencil-fill scale-110 hover:text-bolt-elements-item-contentAccent"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    toggleEditMode();
+                  }}
+                />
+              </div>
+            </WithTooltip>
+          </TooltipProvider>
         </>
       )}
     </div>
