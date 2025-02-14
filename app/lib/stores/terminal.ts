@@ -9,14 +9,17 @@ import { logStore } from './logs';
 import { generateId } from '~/utils/fileUtils';
 
 const TERMINAL_ERROR_TIMEOUT = 5000; // 5 seconds
+const TERMINAL_IDLE_TIMEOUT = 5000; // 5 seconds for idle detection
 
 export class TerminalStore {
   #webcontainer: Promise<WebContainer>;
   #terminals: Array<{ terminal: ITerminal; process: WebContainerProcess }> = [];
   #boltTerminal = newBoltShellProcess();
   #lastAIActivity = Date.now();
+  #lastTerminalActivity = Date.now();
   #terminalBuffer = '';
   #monitoringTimeout: NodeJS.Timeout | null = null;
+  #isProcessRunning = false;
 
   showTerminal: WritableAtom<boolean> = import.meta.hot?.data.showTerminal ?? atom(true);
 
@@ -39,6 +42,7 @@ export class TerminalStore {
     // Reset monitoring state
     this.#terminalBuffer = '';
     this.#lastAIActivity = Date.now();
+    this.#lastTerminalActivity = Date.now();
 
     // Clear any existing monitoring timeout
     if (this.#monitoringTimeout) {
@@ -51,24 +55,48 @@ export class TerminalStore {
     }, 1000); // Check every second
   }
 
+  private _updateTerminalActivity(data: string) {
+    this.#lastTerminalActivity = Date.now();
+    this.#terminalBuffer += data;
+
+    // Check for common process start/end indicators
+    if (data.includes('Starting') || data.includes('Running') || data.includes('Executing')) {
+      this.#isProcessRunning = true;
+    } else if (data.includes('Finished') || data.includes('Completed') || data.includes('Done') || data.includes('$')) {
+      this.#isProcessRunning = false;
+    }
+  }
+
   private async _checkTerminalState() {
     const now = Date.now();
     const aiInactive = !chatStore.get().started || now - this.#lastAIActivity > TERMINAL_ERROR_TIMEOUT;
+    const terminalIdle = !this.#isProcessRunning && now - this.#lastTerminalActivity > TERMINAL_IDLE_TIMEOUT;
 
-    if (aiInactive && this.#terminalBuffer.includes('error')) {
+    // Only report if we have errors or if terminal is idle (but not both)
+    if (
+      aiInactive &&
+      ((this.#terminalBuffer.includes('error') && !terminalIdle) || // Error case
+        (terminalIdle && !this.#terminalBuffer.includes('error'))) // Idle case
+    ) {
       // Get the current file structure
       const files = workbenchStore.files.get();
 
-      // Prepare the error report
-      const errorReport = {
+      // Prepare the report
+      const report = {
         terminalLogs: this.#terminalBuffer,
         files,
         timestamp: new Date().toISOString(),
         lastAIActivity: new Date(this.#lastAIActivity).toISOString(),
+        lastTerminalActivity: new Date(this.#lastTerminalActivity).toISOString(),
+        status: terminalIdle ? 'idle' : 'error',
       };
 
-      // Log the error
-      logStore.logError('Terminal error detected', new Error(this.#terminalBuffer));
+      // Log the event
+      if (terminalIdle) {
+        logStore.logSystem('Terminal is idle', { lastActivity: this.#lastTerminalActivity });
+      } else {
+        logStore.logError('Terminal error detected', new Error(this.#terminalBuffer));
+      }
 
       // Show the terminal
       this.toggleTerminal(true);
@@ -77,12 +105,12 @@ export class TerminalStore {
       chatStore.setKey('started', true);
       workbenchStore.setShowWorkbench(true);
 
-      // Send the error report to the AI system
+      // Send the report to the AI system
       const artifactId = generateId();
       workbenchStore.addArtifact({
         messageId: artifactId,
         id: artifactId,
-        title: 'Terminal Error Report',
+        title: terminalIdle ? 'Terminal Idle Report' : 'Terminal Error Report',
         type: 'shell',
       });
 
@@ -92,12 +120,17 @@ export class TerminalStore {
         artifactId,
         action: {
           type: 'shell',
-          content: JSON.stringify(errorReport, null, 2),
+          content: JSON.stringify(report, null, 2),
         },
       });
 
       // Clear the buffer after reporting
       this.#terminalBuffer = '';
+
+      // Reset activity timestamps
+      if (terminalIdle) {
+        this.#lastTerminalActivity = Date.now();
+      }
     }
   }
 
@@ -112,7 +145,7 @@ export class TerminalStore {
 
       // Monitor terminal output
       terminal.onData((data) => {
-        this.#terminalBuffer += data;
+        this._updateTerminalActivity(data);
         this.#lastAIActivity = Date.now();
       });
     } catch (error: any) {
@@ -128,7 +161,7 @@ export class TerminalStore {
 
       // Monitor terminal output
       terminal.onData((data) => {
-        this.#terminalBuffer += data;
+        this._updateTerminalActivity(data);
         this.#lastAIActivity = Date.now();
       });
     } catch (error: any) {
