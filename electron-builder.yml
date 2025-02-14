@@ -25,7 +25,7 @@ mac:
   target:
     - target: dmg
       arch:
-        - universal
+        - arm64
   hardenedRuntime: true
   gatekeeperAssess: false
   entitlements: entitlements.mac.plist
