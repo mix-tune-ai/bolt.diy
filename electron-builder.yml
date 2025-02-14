@@ -1,4 +1,4 @@
-appId: com.stackblitz.bolt.diy
+appId: com.atmosmasters.bolt.diy
 productName: Bolt Local
 directories:
   buildResources: build
@@ -18,11 +18,19 @@ asarUnpack:
   - electron-update.yml
 
 mac:
+  artifactName: '${name}-v${version}.${ext}'
   icon: icons/icon.icns
+  category: public.app-category.productivity
+  darkModeSupport: true
   target:
-    - dmg
-    - zip
-  identity: null
+    - target: dmg
+      arch:
+        - universal
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: entitlements.mac.plist
+  entitlementsInherit: entitlements.mac.plist
+  identity: 'Developer ID Application: Your Name (TEAM_ID)'
 
 win:
   icon: icons/icon.ico
