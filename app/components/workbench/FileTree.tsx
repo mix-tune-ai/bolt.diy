@@ -3,6 +3,14 @@ import type { FileMap } from '~/lib/stores/files';
 import { classNames } from '~/utils/classNames';
 import { createScopedLogger, renderLogger } from '~/utils/logger';
 import * as ContextMenu from '@radix-ui/react-context-menu';
+import { workbenchStore } from '~/lib/stores/workbench';
+import { toast } from 'react-toastify';
+import { path } from '~/utils/path';
+import { webcontainer } from '~/lib/webcontainer';
+import { logStore } from '~/lib/stores/logs';
+import { generateId } from '~/utils/fileUtils';
+import { chatStore } from '~/lib/stores/chat';
+import type { ActionCallbackData } from '~/lib/runtime/message-parser';
 
 const logger = createScopedLogger('FileTree');
 
@@ -194,6 +202,7 @@ interface FolderContextMenuProps {
   onCopyPath?: () => void;
   onCopyRelativePath?: () => void;
   children: ReactNode;
+  targetPath?: string;
 }
 
 function ContextMenuItem({ onSelect, children }: { onSelect?: () => void; children: ReactNode }) {
@@ -208,7 +217,98 @@ function ContextMenuItem({ onSelect, children }: { onSelect?: () => void; childr
   );
 }
 
-function FileContextMenu({ onCopyPath, onCopyRelativePath, children }: FolderContextMenuProps) {
+function FileContextMenu({ onCopyPath, onCopyRelativePath, children, targetPath }: FolderContextMenuProps) {
+  const handleUploadFiles = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    try {
+      const wc = await webcontainer;
+      const targetDir = targetPath || wc.workdir;
+      const uploadedFiles: { content: string; path: string }[] = [];
+      const binaryFiles: string[] = [];
+
+      for (const file of Array.from(files)) {
+        const filePath = path.join(targetDir, file.name);
+
+        try {
+          const content = await file.text();
+          const relativePath = path.relative(wc.workdir, filePath);
+
+          // Write file to WebContainer
+          await wc.fs.writeFile(relativePath, content);
+
+          // Store file info for AI system
+          uploadedFiles.push({
+            content,
+            path: relativePath,
+          });
+
+          logStore.logSystem('File uploaded successfully', { filePath: relativePath });
+        } catch {
+          // If we can't read as text, it might be a binary file
+          binaryFiles.push(path.relative(wc.workdir, filePath));
+          logStore.logWarning('Skipping binary file', { filePath });
+          continue;
+        }
+      }
+
+      // Create messages for the AI system
+      if (uploadedFiles.length > 0 || binaryFiles.length > 0) {
+        const artifactId = generateId();
+        const messageContent = `I've processed the uploaded files.${binaryFiles.length > 0 ? `\n\nSkipped ${binaryFiles.length} binary files:\n${binaryFiles.map((f) => `- ${f}`).join('\n')}` : ''}
+
+<boltArtifact id="${artifactId}" title="Uploaded Files" type="bundled">
+${uploadedFiles
+  .map(
+    (file) => `<boltAction type="file" filePath="${file.path}">
+${file.content}
+</boltAction>`,
+  )
+  .join('\n\n')}
+</boltArtifact>`;
+
+        // Update workbench store with new files
+        workbenchStore.setDocuments(workbenchStore.files.get());
+
+        // Notify AI system about the new files
+        chatStore.setKey('started', true);
+        workbenchStore.setShowWorkbench(true);
+
+        // Create a new artifact for the uploaded files
+        workbenchStore.addArtifact({
+          messageId: artifactId,
+          id: artifactId,
+          title: 'Uploaded Files',
+          type: 'bundled',
+        });
+
+        // Add the action for the uploaded files
+        const actionData: ActionCallbackData = {
+          messageId: artifactId,
+          actionId: generateId(),
+          artifactId,
+          action: {
+            type: 'file',
+            filePath: uploadedFiles[0].path,
+            content: messageContent,
+          },
+        };
+        workbenchStore.addAction(actionData);
+
+        toast.success(`Successfully uploaded ${files.length} file(s)`);
+      }
+    } catch (error) {
+      console.error('Failed to handle file upload:', error);
+      logStore.logError('Failed to handle file upload', error as Error);
+      toast.error('Failed to upload files');
+    }
+  };
+
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger>{children}</ContextMenu.Trigger>
@@ -220,6 +320,17 @@ function FileContextMenu({ onCopyPath, onCopyRelativePath, children }: FolderCon
           <ContextMenu.Group className="p-1 border-b-px border-solid border-bolt-elements-borderColor">
             <ContextMenuItem onSelect={onCopyPath}>Copy path</ContextMenuItem>
             <ContextMenuItem onSelect={onCopyRelativePath}>Copy relative path</ContextMenuItem>
+            <ContextMenuItem
+              onSelect={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.multiple = true;
+                input.onchange = handleUploadFiles;
+                input.click();
+              }}
+            >
+              Upload files
+            </ContextMenuItem>
           </ContextMenu.Group>
         </ContextMenu.Content>
       </ContextMenu.Portal>
@@ -229,7 +340,7 @@ function FileContextMenu({ onCopyPath, onCopyRelativePath, children }: FolderCon
 
 function Folder({ folder, collapsed, selected = false, onCopyPath, onCopyRelativePath, onClick }: FolderProps) {
   return (
-    <FileContextMenu onCopyPath={onCopyPath} onCopyRelativePath={onCopyRelativePath}>
+    <FileContextMenu onCopyPath={onCopyPath} onCopyRelativePath={onCopyRelativePath} targetPath={folder.fullPath}>
       <NodeButton
         className={classNames('group', {
           'bg-transparent text-bolt-elements-item-contentDefault hover:text-bolt-elements-item-contentActive hover:bg-bolt-elements-item-backgroundActive':
@@ -259,7 +370,7 @@ interface FileProps {
 }
 
 function File({
-  file: { depth, name },
+  file: { depth, name, fullPath },
   onClick,
   onCopyPath,
   onCopyRelativePath,
@@ -267,7 +378,11 @@ function File({
   unsavedChanges = false,
 }: FileProps) {
   return (
-    <FileContextMenu onCopyPath={onCopyPath} onCopyRelativePath={onCopyRelativePath}>
+    <FileContextMenu
+      onCopyPath={onCopyPath}
+      onCopyRelativePath={onCopyRelativePath}
+      targetPath={path.dirname(fullPath)}
+    >
       <NodeButton
         className={classNames('group', {
           'bg-transparent hover:bg-bolt-elements-item-backgroundActive text-bolt-elements-item-contentDefault':
