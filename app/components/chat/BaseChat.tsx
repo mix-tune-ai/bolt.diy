@@ -34,6 +34,7 @@ import ChatAlert from './ChatAlert';
 import type { ModelInfo } from '~/lib/modules/llm/types';
 import ProgressCompilation from './ProgressCompilation';
 import type { ProgressAnnotation } from '~/types/context';
+import SupabaseAlert from './SupabaseAlert';
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -113,6 +114,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [transcript, setTranscript] = useState('');
     const [isModelLoading, setIsModelLoading] = useState<string | undefined>('all');
     const [progressAnnotations, setProgressAnnotations] = useState<ProgressAnnotation[]>([]);
+    const [triggeredSupabaseAlert, setTriggeredSupabaseAlert] = useState(false);
+    const dbKeywords = ['banco de dados', 'database', 'sql'];
     useEffect(() => {
       if (data) {
         const progressList = data.filter(
@@ -184,6 +187,16 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
           });
       }
     }, [providerList, provider]);
+
+    useEffect(() => {
+      if (!actionAlert && input) {
+        const lowerInput = input.toLowerCase();
+        const hasDBKeyword = dbKeywords.some((keyword) => lowerInput.includes(keyword));
+        setTriggeredSupabaseAlert(hasDBKeyword);
+      } else {
+        setTriggeredSupabaseAlert(false);
+      }
+    }, [input, actionAlert]);
 
     const onApiKeysChange = async (providerName: string, apiKey: string) => {
       const newApiKeys = { ...apiKeys, [providerName]: apiKey };
@@ -344,16 +357,43 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                   'position-absolute': chatStarted,
                 })}
               >
-                {actionAlert && (
-                  <ChatAlert
-                    alert={actionAlert}
-                    clearAlert={() => clearAlert?.()}
-                    postMessage={(message) => {
-                      sendMessage?.({} as any, message);
-                      clearAlert?.();
-                    }}
-                  />
-                )}
+                <div className="bg-bolt-elements-background-depth-2">
+                  {actionAlert ? (
+                    (actionAlert.source as string) === 'supabase' ? (
+                      <SupabaseAlert
+                        alert={actionAlert}
+                        clearAlert={() => clearAlert?.()}
+                        postMessage={(message) => {
+                          sendMessage?.({} as any, message);
+                          clearAlert?.();
+                        }}
+                      />
+                    ) : (
+                      <ChatAlert
+                        alert={actionAlert}
+                        clearAlert={() => clearAlert?.()}
+                        postMessage={(message) => {
+                          sendMessage?.({} as any, message);
+                          clearAlert?.();
+                        }}
+                      />
+                    )
+                  ) : (
+                    triggeredSupabaseAlert && (
+                      <SupabaseAlert
+                        alert={{
+                          description: 'We have detected that your project requires a database.',
+                          source: 'supabase',
+                        }}
+                        clearAlert={() => setTriggeredSupabaseAlert(false)}
+                        postMessage={(message) => {
+                          sendMessage?.({} as any, message);
+                          setTriggeredSupabaseAlert(false);
+                        }}
+                      />
+                    )
+                  )}
+                </div>
                 {progressAnnotations && <ProgressCompilation data={progressAnnotations} />}
                 <div
                   className={classNames(
