@@ -18,6 +18,7 @@ import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
 import useViewport from '~/lib/hooks';
 import Tooltip from '~/components/ui/Tooltip';
+import { useSync } from '~/lib/hooks/useSync';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
@@ -165,12 +166,14 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
   const selectedView = useStore(workbenchStore.currentView);
   const syncSettings = useStore(workbenchStore.syncSettings);
   const syncFolder = useStore(workbenchStore.syncFolder);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncing] = useState(false);
   const currentSession = useStore(workbenchStore.currentSession);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [syncStats, setSyncStats] = useState<{ files: number; size: string } | null>(null);
 
   const isSmallViewport = useViewport(1024);
+
+  const { handleSyncRequest, openSyncSettings } = useSync();
 
   const setSelectedView = (view: WorkbenchViewType) => {
     workbenchStore.currentView.set(view);
@@ -198,22 +201,8 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     workbenchStore.setSelectedFile(filePath);
   }, []);
 
-  const handleSync = async () => {
-    if (!syncFolder) {
-      toast.error('Please select a sync folder first');
-      return;
-    }
-
-    try {
-      setIsSyncing(true);
-      await workbenchStore.syncFiles();
-      updateLastSyncTime();
-      updateSyncStats();
-    } catch (error) {
-      console.error('Sync error:', error);
-    } finally {
-      setIsSyncing(false);
-    }
+  const handleSync = () => {
+    handleSyncRequest();
   };
 
   const updateSyncStats = useCallback(() => {
@@ -304,17 +293,8 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   };
 
-  const handleSelectFolder = async () => {
-    try {
-      const handle = await window.showDirectoryPicker();
-      await workbenchStore.setSyncFolder(handle);
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') {
-        return;
-      }
-
-      console.error('Failed to select sync folder:', error);
-    }
+  const handleSelectFolder = () => {
+    openSyncSettings();
   };
 
   return (

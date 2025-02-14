@@ -1,5 +1,8 @@
+export type TimeRange = '24h' | '7d' | '30d' | 'all';
+
 export interface SyncStatistics {
   totalFiles: number;
+  syncedFiles: number;
   totalSize: number;
   duration: number;
   timestamp: number;
@@ -9,9 +12,10 @@ export interface SyncHistoryEntry {
   id: string;
   projectName: string;
   timestamp: number;
-  statistics: SyncStatistics;
+  status: 'success' | 'partial' | 'failed' | 'unknown';
   files: string[];
-  status: 'success' | 'partial' | 'failed';
+  statistics: SyncStatistics;
+  error?: string;
 }
 
 export interface ProjectSyncInfo {
@@ -35,11 +39,9 @@ export interface SyncSession {
   id: string;
   timestamp: number;
   lastSync: number;
-  files: Set<string>;
+  projectName?: string;
+  projectFolder?: string;
   history: SyncHistoryEntry[];
   statistics: SyncStatistics[];
-  projectFolder?: string;
-  projectName?: string;
+  files: Set<string>;
 }
-
-export type TimeRange = '1h' | '24h' | '7d' | '30d' | 'all';

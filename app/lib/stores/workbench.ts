@@ -24,6 +24,7 @@ import ignore from 'ignore';
 import { ProjectFolderManager } from '~/lib/persistence/project-folders';
 import { clearSyncFolderHandle, loadSyncFolderHandle, saveSyncFolderHandle } from '~/lib/persistence/sync-folder';
 import { getLocalStorage, setLocalStorage } from '~/lib/persistence';
+import { syncSidebarStore } from './sync-sidebar';
 
 // Destructure saveAs from the CommonJS module
 const { saveAs } = fileSaver;
@@ -697,6 +698,7 @@ export class WorkbenchStore {
         // Create statistics entry
         const statistics = {
           totalFiles: syncedFiles.size,
+          syncedFiles: syncedFiles.size,
           totalSize,
           duration,
           timestamp: endTime,
@@ -908,132 +910,9 @@ export class WorkbenchStore {
   }
 
   async showSimpleSyncDialog(_projectName: string): Promise<void> {
-    return new Promise<void>((resolve) => {
-      const dialog = document.createElement('dialog');
-      dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50';
-
-      const content = document.createElement('div');
-      content.className = 'bg-bolt-elements-background-depth-2 p-6 rounded-lg shadow-lg max-w-md w-full space-y-4';
-
-      const title = document.createElement('h3');
-      title.className = 'text-lg font-medium text-bolt-elements-textPrimary';
-      title.textContent = 'Configure Sync Settings';
-
-      const description = document.createElement('p');
-      description.className = 'text-sm text-bolt-elements-textSecondary mb-4';
-      description.textContent =
-        'Configure basic sync settings for your project. You can change these later in Settings.';
-
-      const form = document.createElement('div');
-      form.className = 'space-y-4';
-
-      // Main Sync Folder Section
-      const folderSection = document.createElement('div');
-      folderSection.className = 'p-4 rounded-lg bg-bolt-elements-background-depth-4';
-
-      const folderTitle = document.createElement('div');
-      folderTitle.className = 'text-sm font-medium text-bolt-elements-textPrimary mb-2';
-      folderTitle.textContent = 'Main Sync Folder';
-
-      const folderButton = document.createElement('button');
-      folderButton.className =
-        'px-3 py-1.5 text-sm rounded-md bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text transition-colors flex items-center gap-2';
-      folderButton.innerHTML = '<div class="i-ph:folder-simple-plus"></div>Set Main Folder';
-
-      folderButton.onclick = async () => {
-        try {
-          const handle = await window.showDirectoryPicker();
-          await this.setSyncFolder(handle);
-          folderButton.innerHTML = '<div class="i-ph:folder"></div>' + handle.name;
-          folderButton.classList.add('bg-green-500/10', 'text-green-400');
-        } catch (error) {
-          console.error('Failed to set sync folder:', error);
-        }
-      };
-
-      folderSection.appendChild(folderTitle);
-      folderSection.appendChild(folderButton);
-
-      // Auto-sync Section with Interval
-      const autoSyncSection = document.createElement('div');
-      autoSyncSection.className = 'p-4 rounded-lg bg-bolt-elements-background-depth-4';
-
-      const autoSyncCheckbox = document.createElement('label');
-      autoSyncCheckbox.className = 'flex items-center gap-2 text-sm text-bolt-elements-textPrimary cursor-pointer';
-      autoSyncCheckbox.innerHTML = `
-        <input type="checkbox" class="form-checkbox rounded border-bolt-elements-borderColor bg-transparent h-4 w-4">
-        <span>Enable automatic sync</span>
-      `;
-
-      // Add sync interval input
-      const syncIntervalContainer = document.createElement('div');
-      syncIntervalContainer.className = 'mt-2 ml-6 flex items-center gap-2';
-      syncIntervalContainer.innerHTML = `
-        <label class="text-sm text-bolt-elements-textSecondary">Sync every</label>
-        <input type="number" min="1" max="60" value="5" class="w-16 px-2 py-1 text-sm rounded bg-bolt-elements-background-depth-2 border border-bolt-elements-borderColor text-bolt-elements-textPrimary">
-        <label class="text-sm text-bolt-elements-textSecondary">minutes</label>
-      `;
-
-      // Show/hide interval based on checkbox
-      const intervalInput = syncIntervalContainer.querySelector('input') as HTMLInputElement;
-      const autoSyncInput = autoSyncCheckbox.querySelector('input') as HTMLInputElement;
-
-      autoSyncInput.onchange = () => {
-        syncIntervalContainer.style.display = autoSyncInput.checked ? 'flex' : 'none';
-      };
-      syncIntervalContainer.style.display = 'none'; // Initially hidden
-
-      // Sync on Save Section
-      const syncOnSaveCheckbox = document.createElement('label');
-      syncOnSaveCheckbox.className =
-        'flex items-center gap-2 text-sm text-bolt-elements-textPrimary cursor-pointer mt-3';
-      syncOnSaveCheckbox.innerHTML = `
-        <input type="checkbox" class="form-checkbox rounded border-bolt-elements-borderColor bg-transparent h-4 w-4">
-        <span>Sync on save</span>
-      `;
-
-      autoSyncSection.appendChild(autoSyncCheckbox);
-      autoSyncSection.appendChild(syncIntervalContainer);
-      autoSyncSection.appendChild(syncOnSaveCheckbox);
-
-      // Add sections to form
-      form.appendChild(folderSection);
-      form.appendChild(autoSyncSection);
-
-      // Buttons
-      const buttons = document.createElement('div');
-      buttons.className = 'flex justify-end gap-3 mt-6';
-
-      const saveButton = document.createElement('button');
-      saveButton.className =
-        'px-4 py-2 text-sm rounded-md bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text transition-colors';
-      saveButton.textContent = 'Save Settings';
-
-      saveButton.onclick = async () => {
-        const settings = this.syncSettings.get();
-        const newSettings = {
-          ...settings,
-          autoSync: autoSyncInput.checked,
-          syncOnSave: (syncOnSaveCheckbox.querySelector('input') as HTMLInputElement).checked,
-          autoSyncInterval: autoSyncInput.checked ? parseInt(intervalInput.value, 10) : settings.autoSyncInterval,
-        };
-        await this.saveSyncSettings(newSettings);
-        dialog.remove();
-        resolve();
-      };
-
-      buttons.appendChild(saveButton);
-
-      // Assemble dialog
-      content.appendChild(title);
-      content.appendChild(description);
-      content.appendChild(form);
-      content.appendChild(buttons);
-      dialog.appendChild(content);
-
-      document.body.appendChild(dialog);
-      dialog.showModal();
-    });
+    // Instead of showing a dialog, open the sync sidebar
+    syncSidebarStore.open();
+    return Promise.resolve();
   }
 
   async initializeSession() {
@@ -1068,256 +947,33 @@ export class WorkbenchStore {
       // Find existing project by name
       const existingProject = Object.values(settings.projectFolders).find((p) => p.projectName === rawProjectName);
 
-      let shouldSync: boolean;
-      let projectId: string;
+      // Instead of showing a dialog, use the existing sync settings or defaults
+      const shouldSync = existingProject ? existingProject.syncEnabled : settings.defaultSyncEnabled;
 
-      // Handle existing projects
+      // Update session with project info
       if (existingProject) {
-        // Show dialog for existing projects
-        shouldSync = await new Promise<boolean>((resolve) => {
-          const dialog = document.createElement('dialog');
-          dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50';
-
-          const content = document.createElement('div');
-          content.className = 'bg-bolt-elements-background-depth-2 p-6 rounded-lg shadow-lg max-w-md w-full space-y-4';
-
-          const title = document.createElement('h3');
-          title.className = 'text-lg font-medium text-bolt-elements-textPrimary';
-          title.textContent = 'Previous Sync Setting Found';
-
-          const description = document.createElement('p');
-          description.className = 'text-sm text-bolt-elements-textSecondary';
-          description.textContent = existingProject.syncEnabled
-            ? 'This project previously had sync enabled. Would you like to keep sync enabled for this session?'
-            : 'This project previously had sync disabled. Would you like to keep sync disabled for this session?';
-
-          const details = document.createElement('div');
-          details.className = 'text-xs text-bolt-elements-textTertiary mt-2';
-          details.textContent = `Project: ${rawProjectName}`;
-
-          const buttons = document.createElement('div');
-          buttons.className = 'flex justify-end gap-3 mt-6';
-
-          const keepButton = document.createElement('button');
-          keepButton.className =
-            'px-4 py-2 text-sm rounded-md bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text transition-colors';
-          keepButton.textContent = existingProject.syncEnabled ? 'Yes, Keep Sync Enabled' : 'Yes, Keep Sync Disabled';
-
-          keepButton.onclick = () => {
-            dialog.remove();
-            resolve(existingProject.syncEnabled);
-          };
-
-          const toggleButton = document.createElement('button');
-          toggleButton.className =
-            'px-4 py-2 text-sm rounded-md bg-bolt-elements-background-depth-4 text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors';
-          toggleButton.textContent = existingProject.syncEnabled ? 'No, Disable Sync' : 'No, Enable Sync';
-
-          toggleButton.onclick = () => {
-            dialog.remove();
-            resolve(!existingProject.syncEnabled);
-
-            // If enabling sync, open sync settings
-            if (!existingProject.syncEnabled) {
-              this.openSyncSettings();
-            }
-          };
-
-          buttons.appendChild(keepButton);
-          buttons.appendChild(toggleButton);
-          content.appendChild(title);
-          content.appendChild(description);
-          content.appendChild(details);
-          content.appendChild(buttons);
-          dialog.appendChild(content);
-
-          document.body.appendChild(dialog);
-          dialog.showModal();
-        });
-
-        // Use existing project ID
-        projectId =
-          Object.entries(settings.projectFolders).find(([_, p]) => p.projectName === rawProjectName)?.[0] ||
-          rawProjectName;
+        session.projectName = existingProject.projectName;
+        session.projectFolder = existingProject.folderName;
       } else {
-        // Generate new project ID for new projects
-        projectId = `${rawProjectName}_${Date.now().toString(36)}`;
-
-        // Show the new project dialog with sync settings option
-        shouldSync = await new Promise<boolean>((resolve) => {
-          const dialog = document.createElement('dialog');
-          dialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50';
-
-          const content = document.createElement('div');
-          content.className = 'bg-bolt-elements-background-depth-2 p-6 rounded-lg shadow-lg max-w-md w-full space-y-4';
-
-          const title = document.createElement('h3');
-          title.className = 'text-lg font-medium text-bolt-elements-textPrimary';
-          title.textContent = 'File Sync Settings';
-
-          const description = document.createElement('p');
-          description.className = 'text-sm text-bolt-elements-textSecondary';
-          description.textContent = 'Would you like to enable file synchronization for this chat?';
-
-          const details = document.createElement('div');
-          details.className = 'text-xs text-bolt-elements-textTertiary mt-2';
-          details.textContent = `Project: ${rawProjectName}`;
-
-          const buttons = document.createElement('div');
-          buttons.className = 'flex justify-end gap-3 mt-6';
-
-          const noButton = document.createElement('button');
-          noButton.className =
-            'px-4 py-2 text-sm rounded-md bg-bolt-elements-background-depth-4 text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary transition-colors';
-          noButton.textContent = 'No, Skip Sync';
-
-          noButton.onclick = () => {
-            dialog.remove();
-            resolve(false);
-
-            // Show auto-closing confirmation dialog
-            const confirmDialog = document.createElement('dialog');
-            confirmDialog.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/50';
-
-            const confirmContent = document.createElement('div');
-            confirmContent.className =
-              'bg-bolt-elements-background-depth-2 p-6 rounded-lg shadow-lg max-w-md w-full relative';
-
-            const closeButton = document.createElement('button');
-            closeButton.className =
-              'absolute right-0 text-bolt-elements-textTertiary hover:text-bolt-elements-textSecondary transition-colors';
-            closeButton.innerHTML = '<div class="i-ph:x-circle text-2xl"></div>';
-
-            closeButton.onclick = () => {
-              clearInterval(countdownInterval);
-              confirmDialog.remove();
-            };
-
-            const confirmTitle = document.createElement('h3');
-            confirmTitle.className = 'text-lg font-medium text-bolt-elements-textPrimary';
-            confirmTitle.textContent = 'Sync is Disabled';
-
-            const confirmDescription = document.createElement('p');
-            confirmDescription.className = 'text-sm text-bolt-elements-textSecondary';
-            confirmDescription.textContent = 'You can enable and configure sync settings at any time.';
-
-            const countdownText = document.createElement('div');
-            countdownText.className = 'text-xs text-bolt-elements-textTertiary mt-2';
-            countdownText.textContent = 'Closing in 5s';
-
-            const configureButton = document.createElement('button');
-            configureButton.className =
-              'px-4 py-2 text-sm rounded-md bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text transition-colors mt-4';
-            configureButton.textContent = 'Configure Settings';
-
-            configureButton.onclick = () => {
-              confirmDialog.remove();
-
-              // Clear any existing intervals
-              clearInterval(countdownInterval);
-
-              // Show the simple sync settings dialog
-              this.showSimpleSyncDialog(rawProjectName);
-            };
-
-            confirmContent.appendChild(closeButton);
-            confirmContent.appendChild(confirmTitle);
-            confirmContent.appendChild(confirmDescription);
-            confirmContent.appendChild(countdownText);
-            confirmContent.appendChild(configureButton);
-            confirmDialog.appendChild(confirmContent);
-
-            document.body.appendChild(confirmDialog);
-            confirmDialog.showModal();
-
-            // Countdown and auto-close after 5 seconds
-            let timeLeft = 5;
-            const countdownInterval = setInterval(() => {
-              timeLeft--;
-
-              if (timeLeft > 0) {
-                countdownText.textContent = `Closing in ${timeLeft}s`;
-              } else {
-                clearInterval(countdownInterval);
-
-                if (document.body.contains(confirmDialog)) {
-                  confirmDialog.remove();
-                }
-              }
-            }, 1000);
-
-            // Clear interval if dialog is closed manually
-            confirmDialog.addEventListener('close', () => {
-              clearInterval(countdownInterval);
-            });
-          };
-
-          const yesButton = document.createElement('button');
-          yesButton.className =
-            'px-4 py-2 text-sm rounded-md bg-bolt-elements-button-primary-background hover:bg-bolt-elements-button-primary-backgroundHover text-bolt-elements-button-primary-text transition-colors';
-          yesButton.textContent = 'Yes, Configure Sync';
-
-          yesButton.onclick = async () => {
-            dialog.remove();
-            resolve(true);
-
-            // Show the simple sync settings dialog
-            await this.showSimpleSyncDialog(rawProjectName);
-          };
-
-          buttons.appendChild(noButton);
-          buttons.appendChild(yesButton);
-          content.appendChild(title);
-          content.appendChild(description);
-          content.appendChild(details);
-          content.appendChild(buttons);
-          dialog.appendChild(content);
-
-          document.body.appendChild(dialog);
-          dialog.showModal();
-        });
+        session.projectName = rawProjectName;
+        session.projectFolder = rawProjectName;
       }
 
-      // Update settings with user's choice
-      const newSettings = {
-        ...settings,
-        projectFolders: {
-          ...settings.projectFolders,
-          [projectId]: {
-            projectName: rawProjectName,
-            folderName: '',
-            lastSync: Date.now(),
-            syncEnabled: shouldSync,
-          },
-        },
-      };
-      await this.saveSyncSettings(newSettings);
-
-      // Update session with the project ID
-      session.projectName = projectId;
-
-      // If sync is disabled, set session but skip further sync setup
-      if (!shouldSync) {
-        this.currentSession.set(session);
-        return;
-      }
-
-      const folder = this.syncFolder.get();
-
-      if (!folder) {
-        const toastId = 'sync-folder-not-set';
-        toast.info('Configure your sync settings to start syncing files.', {
-          toastId,
-          autoClose: false,
-          closeOnClick: true,
-        });
-      }
-
+      // Set the current session
       this.currentSession.set(session);
 
-      if (this.syncSettings.get().autoSync && folder) {
+      // If sync is enabled and we have a folder, start syncing
+      if (shouldSync && this.syncFolder.get()) {
         await this.syncFiles();
       }
+
+      // If sync is enabled but we don't have a folder, show the sidebar
+      if (shouldSync && !this.syncFolder.get()) {
+        syncSidebarStore.open();
+      }
+    } catch (error) {
+      console.error('Failed to initialize sync session:', error);
+      toast.error('Failed to initialize sync session');
     } finally {
       this.#isInitializing = false;
     }

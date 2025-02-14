@@ -1,30 +1,15 @@
 import { classNames } from '~/utils/classNames';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Progress } from '~/components/ui/Progress';
-import { formatFileSize } from '~/utils/fileUtils';
+import type { SyncHistoryEntry } from '~/types/sync';
 
 interface HistoryEntryProps {
-  entry: {
-    id: string;
-    projectName: string;
-    timestamp: number;
-    status: 'success' | 'partial' | 'failed';
-    files: string[];
-    statistics: {
-      totalFiles: number;
-      totalSize: number;
-      duration: number;
-      progress?: number;
-      filesProcessed?: number;
-      currentFile?: string;
-      speed?: number;
-    };
-  };
+  entry: SyncHistoryEntry;
   expanded: boolean;
   onToggle: () => void;
   formatters: {
+    size: (size: number) => string;
     time: (timestamp: number) => string;
-    size: (bytes: number) => string;
   };
 }
 
@@ -33,221 +18,181 @@ export default function HistoryEntry({ entry, expanded, onToggle, formatters }: 
     switch (status) {
       case 'success':
         return {
-          icon: 'i-ph:sliders-horizontal',
-          color: 'text-purple-500',
-          background: 'bg-purple-500/10',
-          label: 'Completed',
+          icon: 'i-ph:check-circle',
+          color: 'text-green-500',
+          bg: 'bg-green-500/10',
+          label: 'Success',
         };
       case 'partial':
         return {
-          icon: 'i-ph:sliders-horizontal',
-          color: 'text-orange-500',
-          background: 'bg-orange-500/10',
-          label: 'In Progress',
+          icon: 'i-ph:warning-circle',
+          color: 'text-yellow-500',
+          bg: 'bg-yellow-500/10',
+          label: 'Partial',
         };
       case 'failed':
         return {
-          icon: 'i-ph:sliders-horizontal',
+          icon: 'i-ph:x-circle',
           color: 'text-red-500',
-          background: 'bg-red-500/10',
+          bg: 'bg-red-500/10',
           label: 'Failed',
         };
       default:
         return {
-          icon: 'i-ph:sliders-horizontal',
-          color: 'text-gray-500',
-          background: 'bg-gray-500/10',
+          icon: 'i-ph:question-circle',
+          color: 'text-bolt-elements-textSecondary',
+          bg: 'bg-bolt-elements-textSecondary/10',
           label: 'Unknown',
         };
     }
   };
 
   const statusConfig = getStatusConfig(entry.status);
-  const progress =
-    entry.status === 'success'
-      ? 100
-      : entry.status === 'partial' && entry.statistics.filesProcessed !== undefined
-        ? Math.round((entry.statistics.filesProcessed / entry.statistics.totalFiles) * 100)
-        : 0;
-  const speed = entry.statistics.speed ? `${formatFileSize(entry.statistics.speed)}/s` : 'N/A';
+  const progress = Math.min(100, (entry.statistics.syncedFiles / entry.statistics.totalFiles) * 100);
+  const speed = entry.statistics.totalSize / (entry.statistics.duration / 1000);
 
   return (
     <motion.div
       className={classNames(
-        'bg-bolt-elements-background-depth-2 rounded-xl',
+        'rounded-xl p-4',
+        'bg-bolt-elements-background-depth-2',
         'hover:bg-bolt-elements-background-depth-3',
-        'border border-bolt-elements-borderColor/10',
         'transition-all duration-200',
-        'group',
+        'border border-bolt-elements-borderColor/10',
+        'cursor-pointer',
       )}
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
+      onClick={onToggle}
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
       whileHover={{ scale: 1.01 }}
     >
-      <div className="p-4" onClick={onToggle}>
+      <div className="space-y-4">
+        {/* Header */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <motion.div
-              className={classNames('w-8 h-8 flex items-center justify-center rounded-lg', statusConfig.background)}
-              whileHover={{ scale: 1.1 }}
-              transition={{ duration: 0.2 }}
-            >
+          <div className="flex items-center gap-3">
+            <div className={classNames('w-8 h-8 rounded-lg flex items-center justify-center', statusConfig.bg)}>
               <div className={classNames(statusConfig.icon, statusConfig.color, 'w-5 h-5')} />
-            </motion.div>
-
+            </div>
             <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className="font-medium text-bolt-elements-textPrimary group-hover:text-accent-500 transition-colors">
-                  {entry.projectName}
-                </span>
-                <span
-                  className={classNames(
-                    'px-2 py-0.5 text-xs rounded-full font-medium',
-                    statusConfig.background,
-                    statusConfig.color,
-                  )}
-                >
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-medium text-bolt-elements-textPrimary">{entry.projectName}</h3>
+                <span className={classNames('text-xs px-2 py-0.5 rounded-full', statusConfig.bg, statusConfig.color)}>
                   {statusConfig.label}
                 </span>
               </div>
-
-              <div className="flex items-center gap-3 text-xs text-bolt-elements-textSecondary">
-                <div className="flex items-center gap-1">
-                  <div className="i-ph:clock w-3.5 h-3.5" />
-                  <span>{formatters.time(entry.timestamp)} ago</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="i-ph:files w-3.5 h-3.5" />
-                  <span>
-                    {entry.statistics.filesProcessed ?? entry.statistics.totalFiles} / {entry.statistics.totalFiles}{' '}
-                    files
-                  </span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="i-ph:database w-3.5 h-3.5" />
-                  <span>{formatters.size(entry.statistics.totalSize)}</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <div className="i-ph:gauge w-3.5 h-3.5" />
-                  <span>{speed}</span>
-                </div>
-              </div>
+              <p className="text-xs text-bolt-elements-textSecondary">{formatters.time(entry.timestamp)} ago</p>
             </div>
           </div>
 
-          <motion.div
-            className={classNames(
-              'i-ph:caret-down w-4 h-4',
-              'text-bolt-elements-textTertiary group-hover:text-accent-500',
-              'transition-colors',
-            )}
-            animate={{ rotate: expanded ? 180 : 0 }}
-            transition={{ duration: 0.2 }}
-          />
+          <div className="flex items-center gap-4">
+            <div className="text-xs text-bolt-elements-textSecondary">
+              {entry.statistics.syncedFiles} / {entry.statistics.totalFiles} files
+            </div>
+            <div
+              className={classNames('i-ph:caret-down w-4 h-4 text-bolt-elements-textSecondary transition-transform', {
+                'rotate-180': expanded,
+              })}
+            />
+          </div>
         </div>
 
+        {/* Progress */}
+        <Progress
+          value={progress}
+          className={classNames(
+            'h-1.5',
+            entry.status === 'success'
+              ? 'bg-green-500/10 [&>div]:bg-green-500'
+              : entry.status === 'partial'
+                ? 'bg-yellow-500/10 [&>div]:bg-yellow-500'
+                : entry.status === 'failed'
+                  ? 'bg-red-500/10 [&>div]:bg-red-500'
+                  : 'bg-bolt-elements-textSecondary/10 [&>div]:bg-bolt-elements-textSecondary',
+          )}
+        />
+
+        {/* Details */}
         <AnimatePresence>
           {expanded && (
             <motion.div
-              className="mt-4 pt-4 border-t border-bolt-elements-borderColor/10"
+              className="space-y-4 pt-4 border-t border-bolt-elements-borderColor/10"
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
             >
-              <div className="space-y-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-bolt-elements-textSecondary">
-                    <span>Sync Progress</span>
-                    <span>{progress}%</span>
+              {/* Stats */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-bolt-elements-textSecondary">
+                    <div className="i-ph:files text-purple-500 w-4 h-4" />
+                    Total Files
                   </div>
-                  <Progress
-                    value={progress}
-                    className={classNames('h-1', {
-                      'bg-purple-500/10 [&>div]:bg-purple-500': entry.status === 'success',
-                      'bg-orange-500/10 [&>div]:bg-orange-500': entry.status === 'partial',
-                      'bg-red-500/10 [&>div]:bg-red-500': entry.status === 'failed',
-                    })}
-                  />
-                  {entry.statistics.currentFile && (
-                    <div className="text-xs text-bolt-elements-textTertiary flex items-center gap-1.5">
-                      <div className="i-ph:arrow-right w-3 h-3" />
-                      <span className="truncate">{entry.statistics.currentFile}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 text-xs">
-                  <div className="space-y-2">
-                    <div className="font-medium text-bolt-elements-textSecondary">Transfer Details</div>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-bolt-elements-textSecondary">Speed</span>
-                        <span className="text-bolt-elements-textPrimary">{speed}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-bolt-elements-textSecondary">Duration</span>
-                        <span className="text-bolt-elements-textPrimary">
-                          {(entry.statistics.duration / 1000).toFixed(1)}s
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-bolt-elements-textSecondary">Total Size</span>
-                        <span className="text-bolt-elements-textPrimary">
-                          {formatters.size(entry.statistics.totalSize)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="font-medium text-bolt-elements-textSecondary">Files</div>
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-bolt-elements-textSecondary">Total</span>
-                        <span className="text-bolt-elements-textPrimary">{entry.statistics.totalFiles}</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-bolt-elements-textSecondary">Processed</span>
-                        <span className="text-bolt-elements-textPrimary">
-                          {entry.statistics.filesProcessed ?? entry.statistics.totalFiles}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-bolt-elements-textSecondary">Remaining</span>
-                        <span className="text-bolt-elements-textPrimary">
-                          {entry.statistics.filesProcessed
-                            ? entry.statistics.totalFiles - entry.statistics.filesProcessed
-                            : 0}
-                        </span>
-                      </div>
-                    </div>
+                  <div className="text-sm font-medium text-bolt-elements-textPrimary">
+                    {entry.statistics.totalFiles}
                   </div>
                 </div>
 
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-bolt-elements-textSecondary">
+                    <div className="i-ph:database text-purple-500 w-4 h-4" />
+                    Total Size
+                  </div>
+                  <div className="text-sm font-medium text-bolt-elements-textPrimary">
+                    {formatters.size(entry.statistics.totalSize)}
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-bolt-elements-textSecondary">
+                    <div className="i-ph:timer text-purple-500 w-4 h-4" />
+                    Duration
+                  </div>
+                  <div className="text-sm font-medium text-bolt-elements-textPrimary">
+                    {(entry.statistics.duration / 1000).toFixed(1)}s
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2 text-xs text-bolt-elements-textSecondary">
+                    <div className="i-ph:lightning text-purple-500 w-4 h-4" />
+                    Speed
+                  </div>
+                  <div className="text-sm font-medium text-bolt-elements-textPrimary">{formatters.size(speed)}/s</div>
+                </div>
+              </div>
+
+              {/* Files */}
+              {entry.files && entry.files.length > 0 && (
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-bolt-elements-textSecondary">Synced Files</div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <h4 className="text-xs font-medium text-bolt-elements-textSecondary">Synced Files</h4>
+                  <div className="space-y-1 max-h-32 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-bolt-elements-borderColor scrollbar-track-transparent">
                     {entry.files.map((file, index) => (
-                      <motion.div
-                        key={file}
+                      <div
+                        key={index}
                         className={classNames(
-                          'text-xs text-bolt-elements-textSecondary',
-                          'hover:text-bolt-elements-textPrimary',
-                          'transition-colors flex items-center gap-2',
+                          'text-xs px-2 py-1 rounded',
+                          'bg-bolt-elements-background-depth-3',
+                          'text-bolt-elements-textSecondary',
                           'truncate',
                         )}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
                       >
-                        <div className="i-ph:file-text w-3.5 h-3.5 flex-shrink-0" />
-                        <span className="truncate">{file}</span>
-                      </motion.div>
+                        {file}
+                      </div>
                     ))}
                   </div>
                 </div>
-              </div>
+              )}
+
+              {/* Error */}
+              {entry.error && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-medium text-red-500">Error Details</h4>
+                  <div className={classNames('text-xs p-2 rounded', 'bg-red-500/10', 'text-red-500', 'font-mono')}>
+                    {entry.error}
+                  </div>
+                </div>
+              )}
             </motion.div>
           )}
         </AnimatePresence>

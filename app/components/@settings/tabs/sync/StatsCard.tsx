@@ -9,7 +9,7 @@ interface StatsCardProps {
   trend?: {
     value: number;
     label: string;
-    progress?: number;
+    progress: number;
   };
 }
 
@@ -17,63 +17,48 @@ export default function StatsCard({ icon, label, value, trend }: StatsCardProps)
   return (
     <motion.div
       className={classNames(
-        'p-5 rounded-xl',
-        'bg-bolt-elements-background-depth-2',
+        'bg-bolt-elements-background-depth-2 rounded-xl p-5',
         'hover:bg-bolt-elements-background-depth-3',
-        'border border-bolt-elements-borderColor/10',
         'transition-all duration-200',
-        'group',
+        'border border-bolt-elements-borderColor/10',
       )}
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ scale: 1.02 }}
+      whileHover={{ scale: 1.01 }}
     >
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
-          <div
-            className={classNames(
-              'w-8 h-8 flex items-center justify-center rounded-lg',
-              'bg-purple-500/10 text-purple-500',
-              'group-hover:bg-purple-500/20',
-              'transition-colors duration-200',
-              icon,
-            )}
-          />
-          {trend && (
-            <motion.div
-              className={classNames(
-                'flex flex-col items-end gap-1',
-                trend.value > 0
-                  ? 'text-purple-500'
-                  : trend.value < 0
-                    ? 'text-red-500'
-                    : 'text-bolt-elements-textTertiary',
-              )}
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 }}
-            >
-              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-xs font-medium bg-bolt-elements-background-depth-3">
-                <div className="i-ph:sliders-horizontal w-3.5 h-3.5" />
-                <span>{trend.label}</span>
-              </div>
-              {trend.progress !== undefined && (
-                <Progress
-                  value={trend.progress}
-                  className={classNames('h-1 w-16', {
-                    'bg-purple-500/10 [&>div]:bg-purple-500': trend.value >= 0,
-                    'bg-red-500/10 [&>div]:bg-red-500': trend.value < 0,
-                  })}
-                />
-              )}
-            </motion.div>
-          )}
-        </div>
+      <div className="flex items-center gap-3 mb-4">
+        <div className={classNames(icon, 'text-purple-500 w-5 h-5')} />
+        <h3 className="text-sm font-medium text-bolt-elements-textPrimary">{label}</h3>
+      </div>
 
-        <div>
-          <div className="text-2xl font-semibold text-bolt-elements-textPrimary mb-1">{value}</div>
-          <div className="text-sm text-bolt-elements-textSecondary">{label}</div>
-        </div>
+      <div className="space-y-3">
+        <div className="text-2xl font-semibold text-bolt-elements-textPrimary">{value}</div>
+
+        {trend && (
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <div className={classNames('text-xs font-medium', trend.value > 0 ? 'text-green-500' : 'text-red-500')}>
+                {trend.label}
+              </div>
+              <div
+                className={classNames(
+                  'w-4 h-4',
+                  trend.value > 0 ? 'i-ph:trend-up text-green-500' : 'i-ph:trend-down text-red-500',
+                )}
+              />
+            </div>
+
+            {trend.progress !== undefined && (
+              <Progress
+                value={trend.progress}
+                className={classNames(
+                  'h-1.5',
+                  trend.value > 0 ? 'bg-green-500/10 [&>div]:bg-green-500' : 'bg-red-500/10 [&>div]:bg-red-500',
+                )}
+              />
+            )}
+          </div>
+        )}
       </div>
     </motion.div>
   );
