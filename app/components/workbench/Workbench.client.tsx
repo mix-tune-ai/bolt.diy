@@ -19,6 +19,7 @@ import { Preview } from './Preview';
 import useViewport from '~/lib/hooks';
 import Tooltip from '~/components/ui/Tooltip';
 import { useSync } from '~/lib/hooks/useSync';
+import { PushToGitHubDialog } from '~/components/@settings/tabs/connections/components/PushToGitHubDialog';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
@@ -170,6 +171,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
   const currentSession = useStore(workbenchStore.currentSession);
   const [lastSyncTime, setLastSyncTime] = useState<string>('');
   const [syncStats, setSyncStats] = useState<{ files: number; size: string } | null>(null);
+  const [showGitHubDialog, setShowGitHubDialog] = useState(false);
 
   const isSmallViewport = useViewport(1024);
 
@@ -297,6 +299,16 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     openSyncSettings();
   };
 
+  const handleGitHubPush = async (repoName: string, username?: string, token?: string, isPrivate?: boolean) => {
+    try {
+      const commitMessage = 'Initial commit from Bolt.diy';
+      return await workbenchStore.pushToGitHub(repoName, commitMessage, username, token, isPrivate);
+    } catch (error) {
+      console.error('Failed to push to GitHub:', error);
+      throw error;
+    }
+  };
+
   return (
     chatStarted && (
       <motion.div
@@ -420,38 +432,16 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
 
                       <div className="h-4 border-l border-bolt-elements-borderColor dark:border-white/10" />
 
-                      <PanelHeaderButton
-                        onClick={async () => {
-                          try {
-                            const repoName = prompt(
-                              'Please enter a name for your new GitHub repository:',
-                              'bolt-generated-project',
-                            );
-
-                            if (!repoName) {
-                              toast.error('Repository name is required');
-                              return;
-                            }
-
-                            const githubToken = prompt('Please enter your GitHub personal access token:');
-
-                            if (!githubToken) {
-                              toast.error('GitHub token is required');
-                              return;
-                            }
-
-                            toast.info('Pushing to GitHub...');
-                            await workbenchStore.pushToGitHub(repoName, githubToken);
-                          } catch (error) {
-                            console.error('Failed to push to GitHub:', error);
-                            toast.error('Failed to push to GitHub. Please check your token and try again.');
-                          }
-                        }}
-                        className="text-sm"
-                      >
+                      <PanelHeaderButton onClick={() => setShowGitHubDialog(true)} className="text-sm">
                         <div className="i-ph:github-logo" />
-                        GitHub
+                        GitHub Upload
                       </PanelHeaderButton>
+
+                      <PushToGitHubDialog
+                        isOpen={showGitHubDialog}
+                        onClose={() => setShowGitHubDialog(false)}
+                        onPush={handleGitHubPush}
+                      />
                     </>
                   )}
                 </div>
