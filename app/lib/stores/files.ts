@@ -2,12 +2,10 @@ import type { PathWatcherEvent, WebContainer } from '@webcontainer/api';
 import { getEncoding } from 'istextorbinary';
 import { map, type MapStore } from 'nanostores';
 import { Buffer } from 'node:buffer';
-import { path } from '~/utils/path';
-import { bufferWatchEvents } from '~/utils/buffer';
 import { WORK_DIR } from '~/utils/constants';
+import { bufferWatchEvents } from '~/utils/buffer';
 import { computeFileModifications } from '~/utils/diff';
 import { createScopedLogger } from '~/utils/logger';
-import { unreachable } from '~/utils/unreachable';
 
 const logger = createScopedLogger('FilesStore');
 
@@ -40,23 +38,36 @@ export class FilesStore {
    * Needs to be reset when the user sends another message and all changes have to be submitted
    * for the model to be aware of the changes.
    */
-  #modifiedFiles: Map<string, string> = import.meta.hot?.data.modifiedFiles ?? new Map();
+  #modifiedFiles: Map<string, string>;
 
   /**
    * Map of files that matches the state of WebContainer.
    */
-  files: MapStore<FileMap> = import.meta.hot?.data.files ?? map({});
+  files: MapStore<FileMap>;
 
   get filesCount() {
     return this.#size;
   }
 
-  constructor(webcontainerPromise: Promise<WebContainer>) {
-    this.#webcontainer = webcontainerPromise;
+  constructor(webcontainer: Promise<WebContainer>) {
+    this.#webcontainer = webcontainer;
 
-    if (import.meta.hot) {
-      import.meta.hot.data.files = this.files;
-      import.meta.hot.data.modifiedFiles = this.#modifiedFiles;
+    // Only access localStorage in browser environment
+    let initialFiles = {};
+
+    if (typeof window !== 'undefined') {
+      const persistedFiles = localStorage.getItem('bolt-files');
+      initialFiles = persistedFiles ? JSON.parse(persistedFiles) : {};
+    }
+
+    this.files = map(initialFiles);
+    this.#modifiedFiles = new Map();
+
+    // Only subscribe to storage in browser environment
+    if (typeof window !== 'undefined') {
+      this.files.subscribe((files) => {
+        localStorage.setItem('bolt-files', JSON.stringify(files));
+      });
     }
 
     this.#init();
@@ -81,34 +92,19 @@ export class FilesStore {
   }
 
   async saveFile(filePath: string, content: string) {
-    const webcontainer = await this.#webcontainer;
-
     try {
-      const relativePath = path.relative(webcontainer.workdir, filePath);
+      const webcontainer = await this.#webcontainer;
+      await webcontainer.fs.writeFile(filePath, content);
 
-      if (!relativePath) {
-        throw new Error(`EINVAL: invalid file path, write '${relativePath}'`);
-      }
-
-      const oldContent = this.getFile(filePath)?.content;
-
-      if (!oldContent) {
-        unreachable('Expected content to be defined');
-      }
-
-      await webcontainer.fs.writeFile(relativePath, content);
-
-      if (!this.#modifiedFiles.has(filePath)) {
-        this.#modifiedFiles.set(filePath, oldContent);
-      }
-
-      // we immediately update the file and don't rely on the `change` event coming from the watcher
+      // Update the files store
       this.files.setKey(filePath, { type: 'file', content, isBinary: false });
 
-      logger.info('File updated');
-    } catch (error) {
-      logger.error('Failed to update file content\n\n', error);
+      // Persist to localStorage
+      localStorage.setItem('bolt-files', JSON.stringify(this.files.get()));
 
+      return true;
+    } catch (error) {
+      logger.error('Failed to save file\n\n', error);
       throw error;
     }
   }

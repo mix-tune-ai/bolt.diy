@@ -21,6 +21,7 @@ import type { ActionAlert } from '~/types/actions';
 import { generateId } from '~/utils/fileUtils';
 import { logStore } from '~/lib/stores/logs';
 import { toast } from 'react-toastify';
+import type { WebContainer } from '@webcontainer/api';
 
 // Destructure saveAs from the CommonJS module
 const { saveAs } = fileSaver;
@@ -63,13 +64,45 @@ export class WorkbenchStore {
   modifiedFiles = new Set<string>();
   artifactIdList: string[] = [];
   #globalExecutionQueue = Promise.resolve();
-  constructor() {
+  constructor(_webcontainer: Promise<WebContainer>) {
     if (import.meta.hot) {
       import.meta.hot.data.artifacts = this.artifacts;
       import.meta.hot.data.unsavedFiles = this.unsavedFiles;
       import.meta.hot.data.showWorkbench = this.showWorkbench;
       import.meta.hot.data.currentView = this.currentView;
       import.meta.hot.data.actionAlert = this.actionAlert;
+    }
+
+    // Only access localStorage in browser environment
+    if (typeof window !== 'undefined') {
+      const persistedState = localStorage.getItem('bolt-workbench-state');
+
+      if (persistedState) {
+        const state = JSON.parse(persistedState);
+        (this.selectedFile as WritableAtom<string | undefined>).set(state.selectedFile);
+        this.unsavedFiles.set(new Set(state.unsavedFiles));
+      }
+
+      // Subscribe to changes and persist them
+      this.selectedFile.subscribe((file) => {
+        localStorage.setItem(
+          'bolt-workbench-state',
+          JSON.stringify({
+            selectedFile: file,
+            unsavedFiles: Array.from(this.unsavedFiles.get()),
+          }),
+        );
+      });
+
+      this.unsavedFiles.subscribe((files) => {
+        localStorage.setItem(
+          'bolt-workbench-state',
+          JSON.stringify({
+            selectedFile: this.selectedFile.get(),
+            unsavedFiles: Array.from(files),
+          }),
+        );
+      });
     }
   }
 
@@ -764,4 +797,4 @@ export class WorkbenchStore {
   }
 }
 
-export const workbenchStore = new WorkbenchStore();
+export const workbenchStore = new WorkbenchStore(webcontainer);
