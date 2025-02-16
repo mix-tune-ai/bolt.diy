@@ -110,14 +110,32 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     setIsSyncing(true);
 
     try {
-      const directoryHandle = await window.showDirectoryPicker();
-      await workbenchStore.syncFiles(directoryHandle);
       toast.success('Files synced successfully');
     } catch (error) {
       console.error('Error syncing files:', error);
       toast.error('Failed to sync files');
     } finally {
       setIsSyncing(false);
+    }
+  }, []);
+
+  const handleSyncAllFiles = useCallback(async () => {
+    try {
+      const report = await workbenchStore.saveAllFilesFromClient();
+
+      // Create detailed success message
+      const changes = [
+        report.added.length ? `${report.added.length} files added` : '',
+        report.modified.length ? `${report.modified.length} files modified` : '',
+        report.unchanged.length ? `${report.unchanged.length} files unchanged` : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      toast.success(`Files synchronized: ${changes}`);
+    } catch (error) {
+      console.error('Error syncing files:', error);
+      toast.error('Failed to sync files');
     }
   }, []);
 
@@ -200,6 +218,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
                     onEditorChange={onEditorChange}
                     onFileSave={onFileSave}
                     onFileReset={onFileReset}
+                    onSaveAllFiles={handleSyncAllFiles}
                   />
                 </View>
                 <View

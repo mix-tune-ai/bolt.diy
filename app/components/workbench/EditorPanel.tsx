@@ -20,6 +20,7 @@ import { FileBreadcrumb } from './FileBreadcrumb';
 import { FileTree } from './FileTree';
 import { DEFAULT_TERMINAL_SIZE, TerminalTabs } from './terminal/TerminalTabs';
 import { workbenchStore } from '~/lib/stores/workbench';
+import { IconButton } from '~/components/ui/IconButton';
 
 interface EditorPanelProps {
   files?: FileMap;
@@ -32,6 +33,7 @@ interface EditorPanelProps {
   onFileSelect?: (value?: string) => void;
   onFileSave?: OnEditorSave;
   onFileReset?: () => void;
+  onSaveAllFiles: () => Promise<void>;
 }
 
 const DEFAULT_EDITOR_SIZE = 100 - DEFAULT_TERMINAL_SIZE;
@@ -50,6 +52,7 @@ export const EditorPanel = memo(
     onEditorScroll,
     onFileSave,
     onFileReset,
+    onSaveAllFiles,
   }: EditorPanelProps) => {
     renderLogger.trace('EditorPanel');
 
@@ -95,18 +98,27 @@ export const EditorPanel = memo(
                 {activeFileSegments?.length && (
                   <div className="flex items-center flex-1 text-sm">
                     <FileBreadcrumb pathSegments={activeFileSegments} files={files} onFileSelect={onFileSelect} />
-                    {activeFileUnsaved && (
-                      <div className="flex gap-1 ml-auto -mr-1.5">
-                        <PanelHeaderButton onClick={onFileSave}>
-                          <div className="i-ph:floppy-disk-duotone" />
-                          Save
-                        </PanelHeaderButton>
-                        <PanelHeaderButton onClick={onFileReset}>
-                          <div className="i-ph:clock-counter-clockwise-duotone" />
-                          Reset
-                        </PanelHeaderButton>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <IconButton
+                        title="Save All Files"
+                        onClick={onSaveAllFiles}
+                        className="text-bolt-elements-textSecondary hover:text-bolt-elements-textPrimary"
+                      >
+                        <div className="i-ph:floppy-disk-back-duotone text-lg" />
+                      </IconButton>
+                      {activeFileUnsaved && (
+                        <div className="flex gap-1 ml-auto -mr-1.5">
+                          <PanelHeaderButton onClick={onFileSave}>
+                            <div className="i-ph:floppy-disk-duotone" />
+                            Save
+                          </PanelHeaderButton>
+                          <PanelHeaderButton onClick={onFileReset}>
+                            <div className="i-ph:clock-counter-clockwise-duotone" />
+                            Reset
+                          </PanelHeaderButton>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </PanelHeader>

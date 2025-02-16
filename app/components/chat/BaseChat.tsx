@@ -354,6 +354,10 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
 
     const handleIndexing = async () => {
       try {
+        // First save all files to ensure we're working with the latest content
+        await workbenchStore.saveAllFiles();
+
+        // Then proceed with indexing
         await indexingStore.indexCodebase();
         toast.success('Codebase indexed successfully');
       } catch (error) {

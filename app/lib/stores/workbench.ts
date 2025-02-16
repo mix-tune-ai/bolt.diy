@@ -18,6 +18,9 @@ import { description } from '~/lib/persistence';
 import Cookies from 'js-cookie';
 import { createSampler } from '~/utils/sampler';
 import type { ActionAlert } from '~/types/actions';
+import { generateId } from '~/utils/fileUtils';
+import { logStore } from '~/lib/stores/logs';
+import { toast } from 'sonner';
 
 // Destructure saveAs from the CommonJS module
 const { saveAs } = fileSaver;
@@ -28,6 +31,12 @@ export interface ArtifactState {
   type?: string;
   closed: boolean;
   runner: ActionRunner;
+}
+
+interface FileChangeReport {
+  added: string[];
+  modified: string[];
+  unchanged: string[];
 }
 
 export type ArtifactUpdateState = Pick<ArtifactState, 'title' | 'closed'>;
@@ -406,37 +415,6 @@ export class WorkbenchStore {
     saveAs(content, `${uniqueProjectName}.zip`);
   }
 
-  async syncFiles(targetHandle: FileSystemDirectoryHandle) {
-    const files = this.files.get();
-    const syncedFiles = [];
-
-    for (const [filePath, dirent] of Object.entries(files)) {
-      if (dirent?.type === 'file' && !dirent.isBinary) {
-        const relativePath = extractRelativePath(filePath);
-        const pathSegments = relativePath.split('/');
-        let currentHandle = targetHandle;
-
-        for (let i = 0; i < pathSegments.length - 1; i++) {
-          currentHandle = await currentHandle.getDirectoryHandle(pathSegments[i], { create: true });
-        }
-
-        // create or get the file
-        const fileHandle = await currentHandle.getFileHandle(pathSegments[pathSegments.length - 1], {
-          create: true,
-        });
-
-        // write the file content
-        const writable = await fileHandle.createWritable();
-        await writable.write(dirent.content);
-        await writable.close();
-
-        syncedFiles.push(relativePath);
-      }
-    }
-
-    return syncedFiles;
-  }
-
   async pushToGitHub(
     repoName: string,
     commitMessage?: string,
@@ -550,6 +528,169 @@ export class WorkbenchStore {
       console.error('Error pushing to GitHub:', error);
       throw error; // Rethrow the error for further handling
     }
+  }
+
+  /**
+   * Force saves all files in the editor and tracks changes
+   * @returns Report of file changes
+   */
+  async saveAllFilesFromClient(): Promise<FileChangeReport> {
+    logStore.logInfo('Starting file system synchronization...', {
+      operation: 'sync-start',
+      type: 'file-sync',
+      message: 'Starting full file system synchronization',
+    });
+    toast('Starting file system sync...');
+
+    const files = this.files.get();
+    const documents = this.#editorStore.documents.get();
+    const report: FileChangeReport = {
+      added: [],
+      modified: [],
+      unchanged: [],
+    };
+
+    // Queue for tracking all save operations
+    const saveQueue: Promise<void>[] = [];
+
+    // Add to action queue to ensure sequential processing
+    this.addToExecutionQueue(async () => {
+      logStore.logInfo('Processing editor documents...', {
+        operation: 'sync-documents',
+        type: 'file-sync',
+        message: 'Processing documents currently open in editor',
+      });
+
+      // First handle documents currently loaded in editor
+      for (const [filePath, document] of Object.entries(documents)) {
+        if (!document) {
+          continue;
+        }
+
+        const existingFile = this.#filesStore.getFile(filePath);
+        const savePromise = this.#filesStore.saveFile(filePath, document.value).then(() => {
+          if (!existingFile) {
+            logStore.logInfo(`Added new file: ${filePath}`, {
+              operation: 'sync-add',
+              type: 'file-sync',
+              message: `New file added to sync: ${filePath}`,
+              file: filePath,
+            });
+            report.added.push(filePath);
+          } else if (existingFile.content !== document.value) {
+            logStore.logInfo(`Modified file: ${filePath}`, {
+              operation: 'sync-modify',
+              type: 'file-sync',
+              message: `Modified file synced: ${filePath}`,
+              file: filePath,
+            });
+            report.modified.push(filePath);
+          } else {
+            logStore.logInfo(`Checked file (unchanged): ${filePath}`, {
+              operation: 'sync-check',
+              type: 'file-sync',
+              message: `File verified unchanged: ${filePath}`,
+              file: filePath,
+            });
+            report.unchanged.push(filePath);
+          }
+        });
+
+        saveQueue.push(savePromise);
+      }
+
+      logStore.logInfo('Processing remaining files...', {
+        operation: 'sync-remaining',
+        type: 'file-sync',
+        message: 'Processing files not currently open in editor',
+      });
+
+      // Then handle any remaining files not loaded in editor
+      for (const [filePath, dirent] of Object.entries(files)) {
+        if (!dirent?.type || dirent.type !== 'file' || dirent.isBinary || documents[filePath]) {
+          continue;
+        }
+
+        const existingFile = this.#filesStore.getFile(filePath);
+        const savePromise = this.#filesStore.saveFile(filePath, dirent.content).then(() => {
+          if (!existingFile) {
+            logStore.logInfo(`Added new file: ${filePath}`, {
+              operation: 'sync-add',
+              type: 'file-sync',
+              message: `New file added to sync: ${filePath}`,
+              file: filePath,
+            });
+            report.added.push(filePath);
+          } else if (existingFile.content !== dirent.content) {
+            logStore.logInfo(`Modified file: ${filePath}`, {
+              operation: 'sync-modify',
+              type: 'file-sync',
+              message: `Modified file synced: ${filePath}`,
+              file: filePath,
+            });
+            report.modified.push(filePath);
+          } else {
+            logStore.logInfo(`Checked file (unchanged): ${filePath}`, {
+              operation: 'sync-check',
+              type: 'file-sync',
+              message: `File verified unchanged: ${filePath}`,
+              file: filePath,
+            });
+            report.unchanged.push(filePath);
+          }
+        });
+
+        saveQueue.push(savePromise);
+      }
+
+      // Wait for all saves to complete
+      await Promise.all(saveQueue);
+      logStore.logInfo('All file operations completed', {
+        operation: 'sync-complete',
+        type: 'file-sync',
+        message: 'All file synchronization operations completed',
+      });
+
+      // Clear tracking states
+      this.unsavedFiles.set(new Set());
+      this.modifiedFiles.clear();
+
+      // Create and run a file sync action
+      const syncAction: ActionCallbackData = {
+        messageId: generateId(),
+        artifactId: 'file-sync',
+        actionId: `sync-${Date.now()}`,
+        action: {
+          type: 'shell',
+          content: 'echo "File system synchronized"',
+        },
+      };
+
+      // Add and run the sync action
+      this.addAction(syncAction);
+      await this.runAction(syncAction);
+
+      // Log final summary
+      const summary = [
+        report.added.length ? `${report.added.length} files added` : '',
+        report.modified.length ? `${report.modified.length} files modified` : '',
+        report.unchanged.length ? `${report.unchanged.length} files unchanged` : '',
+      ]
+        .filter(Boolean)
+        .join(', ');
+
+      logStore.logInfo(`Sync complete: ${summary}`, {
+        operation: 'sync-summary',
+        type: 'file-sync',
+        message: `File sync completed: ${summary}`,
+        added: report.added.length,
+        modified: report.modified.length,
+        unchanged: report.unchanged.length,
+      });
+      toast.success(`Files synchronized: ${summary}`);
+    });
+
+    return report;
   }
 }
 

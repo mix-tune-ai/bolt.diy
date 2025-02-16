@@ -5,7 +5,6 @@ import { workbenchStore } from './workbench';
 import { generateId } from '~/utils/fileUtils';
 import { TerminalStore } from './terminal';
 import type { ITerminal } from '~/types/terminal';
-import { chatStore } from '~/lib/stores/chat';
 
 export interface IndexedFile {
   path: string;
@@ -88,7 +87,9 @@ export class IndexingStore {
         virtualTerminal.write(value);
       }
 
-      // Get all files from workbench
+      // Get all files from workbench after ensuring they're saved
+      await workbenchStore.saveAllFiles();
+
       const files = workbenchStore.files.get();
       const totalFiles = Object.keys(files).length;
       let processedFiles = 0;
@@ -131,13 +132,8 @@ export class IndexingStore {
           messages: [
             {
               id: messageId,
-              role: 'user',
-              content: [
-                {
-                  type: 'text',
-                  text: `[Model: gpt-4]\n\n[Provider: OpenAI]\n\nPlease analyze these indexed files:\n\n${fileList}`,
-                },
-              ],
+              role: 'assistant',
+              content: `I've indexed the following files:\n\n${fileList}`,
             },
           ],
           files: newIndexedFiles,
@@ -160,13 +156,6 @@ export class IndexingStore {
         error: null,
         progress: 100,
         lastIndexed: Date.now(),
-      });
-
-      // Update chat state to show chat
-      chatStore.set({
-        ...chatStore.get(),
-        started: true,
-        showChat: true,
       });
 
       toast.success(completionMessage);
