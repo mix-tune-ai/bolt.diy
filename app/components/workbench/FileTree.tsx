@@ -220,7 +220,7 @@ function ContextMenuItem({ onSelect, children }: { onSelect?: () => void; childr
 function FileContextMenu({ onCopyPath, onCopyRelativePath, children, targetPath, isFolder }: FolderContextMenuProps) {
   const { toast } = useToast();
 
-  const handleUploadFiles = async (event: Event) => {
+  const handleFileUpload = async (event: Event) => {
     const input = event.target as HTMLInputElement;
     const files = input.files;
 
@@ -233,9 +233,39 @@ function FileContextMenu({ onCopyPath, onCopyRelativePath, children, targetPath,
       await workbenchStore.handleFileUpload(files, targetPath);
     } catch (error) {
       toast('Failed to upload files', { type: 'error' });
-
-      // Error handling is done in the store
       console.error('Error in upload handler:', error);
+    }
+  };
+
+  const handleFolderUpload = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const files = input.files;
+
+    if (!files || files.length === 0) {
+      return;
+    }
+
+    try {
+      toast('Uploading folder...', { type: 'info' });
+      await workbenchStore.handleFolderUpload(files, targetPath);
+    } catch (error) {
+      toast('Failed to upload folder', { type: 'error' });
+      console.error('Error in folder upload handler:', error);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!targetPath) {
+      return;
+    }
+
+    try {
+      toast('Deleting...', { type: 'info' });
+      await workbenchStore.deleteFileOrFolder(targetPath);
+      toast('Deleted successfully', { type: 'success' });
+    } catch (error) {
+      toast('Failed to delete', { type: 'error' });
+      console.error('Error in delete handler:', error);
     }
   };
 
@@ -251,18 +281,33 @@ function FileContextMenu({ onCopyPath, onCopyRelativePath, children, targetPath,
             <ContextMenuItem onSelect={onCopyPath}>Copy path</ContextMenuItem>
             <ContextMenuItem onSelect={onCopyRelativePath}>Copy relative path</ContextMenuItem>
             {isFolder && (
-              <ContextMenuItem
-                onSelect={() => {
-                  const input = document.createElement('input');
-                  input.type = 'file';
-                  input.multiple = true;
-                  input.onchange = handleUploadFiles;
-                  input.click();
-                }}
-              >
-                Upload files
-              </ContextMenuItem>
+              <>
+                <ContextMenuItem
+                  onSelect={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.multiple = true;
+                    input.onchange = handleFileUpload;
+                    input.click();
+                  }}
+                >
+                  Upload files
+                </ContextMenuItem>
+                <ContextMenuItem
+                  onSelect={() => {
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.multiple = true;
+                    input.webkitdirectory = true;
+                    input.onchange = handleFolderUpload;
+                    input.click();
+                  }}
+                >
+                  Upload folder
+                </ContextMenuItem>
+              </>
             )}
+            <ContextMenuItem onSelect={handleDelete}>Delete</ContextMenuItem>
           </ContextMenu.Group>
         </ContextMenu.Content>
       </ContextMenu.Portal>

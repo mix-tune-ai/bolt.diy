@@ -118,8 +118,8 @@ export class WorkbenchStore {
     return this.#filesStore.files;
   }
 
-  get currentDocument(): ReadableAtom<EditorDocument | undefined> {
-    return this.#editorStore.currentDocument;
+  get currentDocument(): WritableAtom<EditorDocument | undefined> {
+    return this.#editorStore.currentDocument as WritableAtom<EditorDocument | undefined>;
   }
 
   get selectedFile(): ReadableAtom<string | undefined> {
@@ -826,6 +826,188 @@ export class WorkbenchStore {
         error: error instanceof Error ? error.message : String(error),
       });
       toast.error('Failed to upload files');
+      throw error;
+    }
+  }
+
+  async handleFolderUpload(files: FileList, targetPath?: string): Promise<void> {
+    try {
+      const wc = await webcontainer;
+      const targetDir = targetPath || ''; // Use empty string if no target path
+      const uploadedFiles: { content: string; path: string }[] = [];
+      const binaryFiles: string[] = [];
+
+      // Create a batch of file operations
+      const writeOperations = Array.from(files).map(async (file) => {
+        // Get the relative path from the uploaded folder structure
+        const relativeFolderPath = file.webkitRelativePath;
+        const filePath = path.join(targetDir, relativeFolderPath);
+        const relativeToWorkdir = filePath.replace(/^\/+/, ''); // Remove leading slashes
+
+        // Skip ignored files
+        if (this.#filesStore.isFileIgnored(relativeToWorkdir)) {
+          logStore.logWarning('Skipping protected file', {
+            operation: 'upload-skip-protected',
+            type: 'folder-upload',
+            message: `Skipped protected file: ${relativeFolderPath}`,
+            file: relativeToWorkdir,
+          });
+          return;
+        }
+
+        try {
+          const content = await file.text();
+
+          // Ensure parent directories exist
+          const dirPath = path.dirname(relativeToWorkdir);
+
+          if (dirPath !== '.') {
+            await wc.fs.mkdir(dirPath, { recursive: true });
+          }
+
+          // Write file to WebContainer
+          await wc.fs.writeFile(relativeToWorkdir, content);
+
+          // Update store with new file
+          this.files.set({
+            ...this.files.get(),
+            [relativeToWorkdir]: {
+              content,
+              type: 'file',
+              isBinary: false,
+            },
+          });
+
+          uploadedFiles.push({ content, path: relativeToWorkdir });
+
+          logStore.logInfo('File uploaded successfully', {
+            operation: 'upload-success',
+            type: 'folder-upload',
+            message: `Successfully uploaded file: ${relativeFolderPath}`,
+            file: relativeToWorkdir,
+          });
+        } catch (error) {
+          if (error instanceof Error && error.name === 'QuotaExceededError') {
+            throw error; // Re-throw quota errors to handle them separately
+          }
+
+          // If we can't read as text, it might be a binary file
+          binaryFiles.push(relativeFolderPath);
+          logStore.logWarning('Skipping binary file', {
+            operation: 'upload-skip-binary',
+            type: 'folder-upload',
+            message: `Skipped binary file: ${relativeFolderPath}`,
+            file: relativeToWorkdir,
+          });
+        }
+      });
+
+      // Execute all write operations
+      await Promise.all(writeOperations);
+
+      if (uploadedFiles.length > 0) {
+        toast.success(`Uploaded ${uploadedFiles.length} files`);
+      }
+
+      if (binaryFiles.length > 0) {
+        toast.info(`Skipped ${binaryFiles.length} binary files`);
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === 'QuotaExceededError') {
+        toast.error('Storage quota exceeded. Try uploading fewer files.');
+        logStore.logError('Storage quota exceeded', {
+          operation: 'upload-error',
+          type: 'folder-upload',
+          message: 'Storage quota exceeded during folder upload',
+          error: 'QuotaExceededError',
+        });
+      } else {
+        console.error('Error uploading folder:', error);
+        logStore.logError('Failed to upload folder', {
+          operation: 'upload-error',
+          type: 'folder-upload',
+          message: 'Error occurred during folder upload',
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      throw error;
+    }
+  }
+
+  async deleteFileOrFolder(path: string): Promise<void> {
+    try {
+      const wc = await webcontainer;
+      const files = this.files.get();
+
+      // Normalize path to prevent ENOENT errors
+      const normalizedPath = path.replace(/\/+/g, '/').replace(/\/$/, '');
+
+      // Check if file exists in our store first
+      const fileExists = files[normalizedPath] !== undefined;
+
+      if (!fileExists) {
+        console.warn(`Path does not exist in file store: ${normalizedPath}`);
+        return;
+      }
+
+      const isFolder = files[normalizedPath]?.type === 'folder';
+
+      try {
+        // Try to delete from WebContainer
+        await wc.fs.rm(normalizedPath, { recursive: true });
+      } catch (error) {
+        console.log(error);
+
+        /*
+         * If WebContainer fails but we have the file in our store,
+         * we should still clean up the store
+         */
+        console.warn(`WebContainer deletion failed, cleaning up store: ${normalizedPath}`);
+      }
+
+      // Always clean up the store
+      if (isFolder) {
+        // Remove all files and folders from store that start with this path
+        const newFiles = { ...files };
+
+        for (const filePath of Object.keys(newFiles)) {
+          if (filePath === normalizedPath || filePath.startsWith(normalizedPath + '/')) {
+            delete newFiles[filePath];
+          }
+        }
+        this.files.set(newFiles);
+      } else {
+        // Delete single file from store
+        const newFiles = { ...files };
+        delete newFiles[normalizedPath];
+        this.files.set(newFiles);
+      }
+
+      // Clear from unsaved files if present
+      const unsavedFiles = this.unsavedFiles.get();
+
+      if (unsavedFiles.has(normalizedPath)) {
+        const newUnsaved = new Set(unsavedFiles);
+        newUnsaved.delete(normalizedPath);
+        this.unsavedFiles.set(newUnsaved);
+      }
+
+      // If current file is deleted, clear it
+      const currentDoc = this.currentDocument.get();
+
+      if (currentDoc?.filePath === normalizedPath) {
+        this.currentDocument.set(undefined);
+      }
+
+      logStore.logInfo('Successfully deleted', {
+        operation: 'delete',
+        type: isFolder ? 'folder' : 'file',
+        message: `Successfully deleted ${isFolder ? 'folder' : 'file'}: ${normalizedPath}`,
+        path: normalizedPath,
+      });
+    } catch (error) {
+      console.error('Error deleting file/folder:', error);
       throw error;
     }
   }

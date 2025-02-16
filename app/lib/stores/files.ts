@@ -1,4 +1,5 @@
-import type { PathWatcherEvent, WebContainer } from '@webcontainer/api';
+import type { WebContainer } from '@webcontainer/api';
+import type { PathWatcherEvent as WebContainerPathWatcherEvent } from '@webcontainer/api';
 import { getEncoding } from 'istextorbinary';
 import { map, type MapStore } from 'nanostores';
 import { Buffer } from 'node:buffer';
@@ -159,7 +160,7 @@ export class FilesStore {
     );
   }
 
-  #processEventBuffer(events: Array<[events: PathWatcherEvent[]]>) {
+  #processEventBuffer(events: Array<[events: WebContainerPathWatcherEvent[]]>) {
     const watchEvents = events.flat(2);
 
     for (const { type, path, buffer } of watchEvents) {
@@ -170,21 +171,25 @@ export class FilesStore {
         continue;
       }
 
+      // Convert buffer to Buffer type if needed
+      const fileBuffer = buffer ? Buffer.from(buffer.buffer, buffer.byteOffset, buffer.byteLength) : undefined;
+
       switch (type) {
         case 'add_dir': {
-          // we intentionally add a trailing slash so we can distinguish files from folders in the file tree
           this.files.setKey(sanitizedPath, { type: 'folder' });
           break;
         }
         case 'remove_dir': {
           this.files.setKey(sanitizedPath, undefined);
 
-          for (const [direntPath] of Object.entries(this.files)) {
-            if (direntPath.startsWith(sanitizedPath)) {
-              this.files.setKey(direntPath, undefined);
+          // Remove all nested files/folders
+          const currentFiles = this.files.get();
+
+          for (const [path] of Object.entries(currentFiles)) {
+            if (path.startsWith(sanitizedPath + '/')) {
+              this.files.setKey(path, undefined);
             }
           }
-
           break;
         }
         case 'add_file':
@@ -194,21 +199,13 @@ export class FilesStore {
           }
 
           let content = '';
-
-          /**
-           * @note This check is purely for the editor. The way we detect this is not
-           * bullet-proof and it's a best guess so there might be false-positives.
-           * The reason we do this is because we don't want to display binary files
-           * in the editor nor allow to edit them.
-           */
-          const isBinary = isBinaryFile(buffer);
+          const isBinary = isBinaryFile(fileBuffer);
 
           if (!isBinary) {
-            content = this.#decodeFileContent(buffer);
+            content = this.#decodeFileContent(fileBuffer);
           }
 
           this.files.setKey(sanitizedPath, { type: 'file', content, isBinary });
-
           break;
         }
         case 'remove_file': {
