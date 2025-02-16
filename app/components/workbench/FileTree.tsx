@@ -4,14 +4,8 @@ import { classNames } from '~/utils/classNames';
 import { createScopedLogger, renderLogger } from '~/utils/logger';
 import * as ContextMenu from '@radix-ui/react-context-menu';
 import { workbenchStore } from '~/lib/stores/workbench';
-import { toast } from 'react-toastify';
+import { useToast } from '~/components/ui/use-toast';
 import { path } from '~/utils/path';
-import { webcontainer } from '~/lib/webcontainer';
-import { logStore } from '~/lib/stores/logs';
-import { generateId } from '~/utils/fileUtils';
-import { chatStore } from '~/lib/stores/chat';
-import type { ActionCallbackData } from '~/lib/runtime/message-parser';
-import { indexingStore } from '~/lib/stores/indexing';
 
 const logger = createScopedLogger('FileTree');
 
@@ -224,6 +218,8 @@ function ContextMenuItem({ onSelect, children }: { onSelect?: () => void; childr
 }
 
 function FileContextMenu({ onCopyPath, onCopyRelativePath, children, targetPath, isFolder }: FolderContextMenuProps) {
+  const { toast } = useToast();
+
   const handleUploadFiles = async (event: Event) => {
     const input = event.target as HTMLInputElement;
     const files = input.files;
@@ -233,93 +229,13 @@ function FileContextMenu({ onCopyPath, onCopyRelativePath, children, targetPath,
     }
 
     try {
-      const wc = await webcontainer;
-      const targetDir = targetPath || wc.workdir;
-      const uploadedFiles: { content: string; path: string }[] = [];
-      const binaryFiles: string[] = [];
-
-      for (const file of Array.from(files)) {
-        const filePath = path.join(targetDir, file.name);
-
-        try {
-          const content = await file.text();
-          const relativePath = path.relative(wc.workdir, filePath);
-
-          // Write file to WebContainer
-          await wc.fs.writeFile(relativePath, content);
-
-          // Store file info for AI system
-          uploadedFiles.push({
-            content,
-            path: relativePath,
-          });
-
-          logStore.logSystem('File uploaded successfully', { filePath: relativePath });
-        } catch {
-          // If we can't read as text, it might be a binary file
-          binaryFiles.push(path.relative(wc.workdir, filePath));
-          logStore.logWarning('Skipping binary file', { filePath });
-          continue;
-        }
-      }
-
-      // Create messages for the AI system
-      if (uploadedFiles.length > 0 || binaryFiles.length > 0) {
-        const artifactId = generateId();
-        const messageContent = `I've processed the uploaded files.${binaryFiles.length > 0 ? `\n\nSkipped ${binaryFiles.length} binary files:\n${binaryFiles.map((f) => `- ${f}`).join('\n')}` : ''}
-
-<boltArtifact id="${artifactId}" title="Uploaded Files" type="bundled">
-${uploadedFiles
-  .map(
-    (file) => `<boltAction type="file" filePath="${file.path}">
-${file.content}
-</boltAction>`,
-  )
-  .join('\n\n')}
-</boltArtifact>`;
-
-        // Update workbench store with new files
-        workbenchStore.setDocuments(workbenchStore.files.get());
-
-        // Notify AI system about the new files
-        chatStore.setKey('started', true);
-        workbenchStore.setShowWorkbench(true);
-
-        // Create a new artifact for the uploaded files
-        workbenchStore.addArtifact({
-          messageId: artifactId,
-          id: artifactId,
-          title: 'Uploaded Files',
-          type: 'bundled',
-        });
-
-        // Add the action for the uploaded files
-        const actionData: ActionCallbackData = {
-          messageId: artifactId,
-          actionId: generateId(),
-          artifactId,
-          action: {
-            type: 'file',
-            filePath: uploadedFiles[0].path,
-            content: messageContent,
-          },
-        };
-        workbenchStore.addAction(actionData);
-
-        // Trigger reindexing after files are uploaded
-        try {
-          await indexingStore.indexCodebase();
-          toast.success(`Successfully uploaded ${files.length} file(s) and reindexed codebase`);
-        } catch (error) {
-          console.error('Failed to reindex after upload:', error);
-          logStore.logError('Failed to reindex after upload', error as Error);
-          toast.error('Files uploaded but failed to reindex codebase');
-        }
-      }
+      toast('Uploading files...', { type: 'info' });
+      await workbenchStore.handleFileUpload(files, targetPath);
     } catch (error) {
-      console.error('Failed to handle file upload:', error);
-      logStore.logError('Failed to handle file upload', error as Error);
-      toast.error('Failed to upload files');
+      toast('Failed to upload files', { type: 'error' });
+
+      // Error handling is done in the store
+      console.error('Error in upload handler:', error);
     }
   };
 

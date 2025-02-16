@@ -2,7 +2,6 @@ import { useStore } from '@nanostores/react';
 import { motion, type HTMLMotionProps, type Variants } from 'framer-motion';
 import { computed } from 'nanostores';
 import { memo, useCallback, useEffect, useState } from 'react';
-import { toast } from 'react-toastify';
 import {
   type OnChangeCallback as OnEditorChange,
   type OnScrollCallback as OnEditorScroll,
@@ -18,6 +17,7 @@ import { EditorPanel } from './EditorPanel';
 import { Preview } from './Preview';
 import useViewport from '~/lib/hooks';
 import { PushToGitHubDialog } from '~/components/@settings/tabs/connections/components/PushToGitHubDialog';
+import { useToast } from '~/components/ui/use-toast';
 
 interface WorkspaceProps {
   chatStarted?: boolean;
@@ -55,6 +55,8 @@ const workbenchVariants = {
 } satisfies Variants;
 
 export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => {
+  const { toast } = useToast();
+
   renderLogger.trace('Workbench');
 
   const [isSyncing, setIsSyncing] = useState(false);
@@ -98,7 +100,7 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
 
   const onFileSave = useCallback(() => {
     workbenchStore.saveCurrentDocument().catch(() => {
-      toast.error('Failed to update file content');
+      toast('Failed to update file content', { type: 'error' });
     });
   }, []);
 
@@ -110,10 +112,11 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
     setIsSyncing(true);
 
     try {
-      toast.success('Files synced successfully');
+      await workbenchStore.saveAllFilesFromClient();
+      toast('Files synced successfully', { type: 'success' });
     } catch (error) {
       console.error('Error syncing files:', error);
-      toast.error('Failed to sync files');
+      toast('Failed to sync files', { type: 'error' });
     } finally {
       setIsSyncing(false);
     }
@@ -132,10 +135,10 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
         .filter(Boolean)
         .join(', ');
 
-      toast.success(`Files synchronized: ${changes}`);
+      toast(`Files synchronized: ${changes}`, { type: 'success' });
     } catch (error) {
       console.error('Error syncing files:', error);
-      toast.error('Failed to sync files');
+      toast('Failed to sync files', { type: 'error' });
     }
   }, []);
 
@@ -240,8 +243,8 @@ export const Workbench = memo(({ chatStarted, isStreaming }: WorkspaceProps) => 
               return repoUrl;
             } catch (error) {
               console.error('Error pushing to GitHub:', error);
-              toast.error('Failed to push to GitHub');
-              throw error; // Rethrow to let PushToGitHubDialog handle the error state
+              toast('Failed to push to GitHub', { type: 'error' });
+              throw error;
             }
           }}
         />

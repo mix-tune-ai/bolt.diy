@@ -6,7 +6,7 @@ import { webcontainer } from '~/lib/webcontainer';
 import type { ITerminal } from '~/types/terminal';
 import { unreachable } from '~/utils/unreachable';
 import { EditorStore } from './editor';
-import { FilesStore, type FileMap } from './files';
+import { FilesStore, type FileMap, type File } from './files';
 import { PreviewsStore } from './previews';
 import { TerminalStore } from './terminal';
 import JSZip from 'jszip';
@@ -20,7 +20,7 @@ import { createSampler } from '~/utils/sampler';
 import type { ActionAlert } from '~/types/actions';
 import { generateId } from '~/utils/fileUtils';
 import { logStore } from '~/lib/stores/logs';
-import { toast } from 'sonner';
+import { toast } from 'react-toastify';
 
 // Destructure saveAs from the CommonJS module
 const { saveAs } = fileSaver;
@@ -220,6 +220,7 @@ export class WorkbenchStore {
     }
 
     await this.saveFile(currentDocument.filePath);
+    toast.success('File saved successfully');
   }
 
   resetCurrentDocument() {
@@ -523,9 +524,13 @@ export class WorkbenchStore {
         sha: newCommit.sha,
       });
 
-      return repo.html_url; // Return the URL instead of showing alert
+      const repoUrl = repo.html_url; // Return the URL instead of showing alert
+      toast.success('Successfully pushed to GitHub');
+
+      return repoUrl;
     } catch (error) {
       console.error('Error pushing to GitHub:', error);
+      toast.error('Failed to push to GitHub');
       throw error; // Rethrow the error for further handling
     }
   }
@@ -540,7 +545,7 @@ export class WorkbenchStore {
       type: 'file-sync',
       message: 'Starting full file system synchronization',
     });
-    toast('Starting file system sync...');
+    toast.info('Starting file system sync...');
 
     const files = this.files.get();
     const documents = this.#editorStore.documents.get();
@@ -691,6 +696,71 @@ export class WorkbenchStore {
     });
 
     return report;
+  }
+
+  async handleFileUpload(files: FileList, targetPath?: string): Promise<void> {
+    try {
+      const wc = await webcontainer;
+      const targetDir = targetPath || wc.workdir;
+      const uploadedFiles: { content: string; path: string }[] = [];
+      const binaryFiles: string[] = [];
+
+      for (const file of Array.from(files)) {
+        const filePath = path.join(targetDir, file.name);
+
+        try {
+          const content = await file.text();
+          const relativePath = path.relative(wc.workdir, filePath);
+
+          // Write file to WebContainer and update store
+          await wc.fs.writeFile(relativePath, content);
+          this.files.set({
+            ...this.files.get(),
+            [relativePath]: {
+              content,
+              type: 'file',
+              isBinary: false,
+            } as File,
+          });
+
+          uploadedFiles.push({ content, path: relativePath });
+
+          logStore.logInfo('File uploaded successfully', {
+            operation: 'upload-success',
+            type: 'file-upload',
+            message: `Successfully uploaded file: ${file.name}`,
+            file: relativePath,
+          });
+          toast.success(`Uploaded: ${file.name}`);
+        } catch {
+          // If we can't read as text, it might be a binary file
+          const relativePath = path.relative(wc.workdir, filePath);
+          binaryFiles.push(relativePath);
+
+          logStore.logWarning('Skipping binary file', {
+            operation: 'upload-skip-binary',
+            type: 'file-upload',
+            message: `Skipped binary file: ${file.name}`,
+            file: relativePath,
+          });
+          toast.warning(`Skipped binary file: ${file.name}`);
+        }
+      }
+
+      if (binaryFiles.length > 0) {
+        toast.info(`Skipped ${binaryFiles.length} binary files`);
+      }
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      logStore.logError('Failed to upload files', {
+        operation: 'upload-error',
+        type: 'file-upload',
+        message: 'Error occurred during file upload',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      toast.error('Failed to upload files');
+      throw error;
+    }
   }
 }
 
