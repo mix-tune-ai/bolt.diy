@@ -35,6 +35,12 @@ import type { ModelInfo } from '~/lib/modules/llm/types';
 import ProgressCompilation from './ProgressCompilation';
 import type { ProgressAnnotation } from '~/types/context';
 import SupabaseAlert from './SupabaseAlert';
+import { indexingStore } from '~/lib/stores/indexing';
+import { useStore } from '@nanostores/react';
+import { workbenchStore } from '~/lib/stores/workbench';
+import { chatStore } from '~/lib/stores/chat';
+import type { BoltAction } from '~/types/actions';
+import type { ActionState } from '~/lib/runtime/action-runner';
 
 const TEXTAREA_MIN_HEIGHT = 76;
 
@@ -116,6 +122,8 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
     const [progressAnnotations, setProgressAnnotations] = useState<ProgressAnnotation[]>([]);
     const [triggeredSupabaseAlert, setTriggeredSupabaseAlert] = useState(false);
     const dbKeywords = ['banco de dados', 'database', 'sql'];
+    const indexingState = useStore(indexingStore.state);
+
     useEffect(() => {
       if (data) {
         const progressList = data.filter(
@@ -343,6 +351,93 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
         setImageDataList?.([...imageDataList, ...newImageData]);
       }
     };
+
+    const handleIndexing = async () => {
+      try {
+        await indexingStore.indexCodebase();
+        toast.success('Codebase indexed successfully');
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Failed to index codebase');
+      }
+    };
+
+    const handleIndexedFiles = async (messageId: string, artifactId: string) => {
+      // Get all actions for this artifact
+      const artifact = workbenchStore.artifacts.get()[artifactId];
+
+      if (!artifact?.runner) {
+        return;
+      }
+
+      const actions = artifact.runner.actions.get();
+      const filteredActions = Object.values(actions).filter((action) => !action.executed);
+
+      if (!filteredActions?.length) {
+        return;
+      }
+
+      // Create a new message with the indexed files
+      const fileList = filteredActions
+        .filter((action: ActionState) => action.type === 'file')
+        .map((action: ActionState) => {
+          const fileAction = action as BoltAction & { type: 'file' };
+          return `${fileAction.filePath}: ${fileAction.content.slice(0, 100)}...`;
+        })
+        .join('\n');
+
+      // Send message through chat API
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                id: messageId,
+                role: 'assistant',
+                content: `I've indexed the following files:\n\n${fileList}`,
+              },
+            ],
+            model,
+            provider: provider?.name,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to send indexed files message');
+        }
+
+        // Update chat state
+        chatStore.set({
+          ...chatStore.get(),
+          started: true,
+        });
+      } catch (error) {
+        toast.error('Failed to process indexed files');
+        console.error('Error sending indexed files message:', error);
+      }
+    };
+
+    // Add event listener for new artifacts
+    useEffect(() => {
+      const unsubscribe = workbenchStore.artifacts.listen((artifacts) => {
+        const artifactEntries = Object.entries(artifacts);
+
+        if (!artifactEntries.length) {
+          return;
+        }
+
+        const [artifactId, artifact] = artifactEntries[artifactEntries.length - 1];
+
+        if (artifact?.type === 'shell' && artifact.title === 'Indexed Files') {
+          handleIndexedFiles(artifact.id, artifactId);
+        }
+      });
+
+      return () => unsubscribe();
+    }, [model, provider]);
 
     const baseChat = (
       <div
@@ -646,6 +741,15 @@ export const BaseChat = React.forwardRef<HTMLDivElement, BaseChatProps>(
                           ) : (
                             <div className="i-bolt:stars text-xl"></div>
                           )}
+                        </IconButton>
+
+                        <IconButton
+                          title="Index Codebase"
+                          disabled={indexingState.isIndexing}
+                          className="transition-all"
+                          onClick={handleIndexing}
+                        >
+                          {indexingState.isIndexing ? 'Indexing...' : 'Index'}
                         </IconButton>
 
                         <SpeechRecognitionButton

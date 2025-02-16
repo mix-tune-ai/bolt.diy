@@ -8,6 +8,7 @@ import { createHead } from 'remix-island';
 import { useEffect } from 'react';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
+import { Toaster } from 'sonner';
 
 import reactToastifyStyles from 'react-toastify/dist/ReactToastify.css?url';
 import globalStyles from './styles/index.scss?url';
@@ -97,6 +98,7 @@ export default function App() {
   return (
     <Layout>
       <Outlet />
+      <Toaster richColors position="top-right" />
     </Layout>
   );
 }

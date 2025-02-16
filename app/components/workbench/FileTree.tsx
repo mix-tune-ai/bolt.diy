@@ -11,6 +11,7 @@ import { logStore } from '~/lib/stores/logs';
 import { generateId } from '~/utils/fileUtils';
 import { chatStore } from '~/lib/stores/chat';
 import type { ActionCallbackData } from '~/lib/runtime/message-parser';
+import { indexingStore } from '~/lib/stores/indexing';
 
 const logger = createScopedLogger('FileTree');
 
@@ -305,7 +306,15 @@ ${file.content}
         };
         workbenchStore.addAction(actionData);
 
-        toast.success(`Successfully uploaded ${files.length} file(s)`);
+        // Trigger reindexing after files are uploaded
+        try {
+          await indexingStore.indexCodebase();
+          toast.success(`Successfully uploaded ${files.length} file(s) and reindexed codebase`);
+        } catch (error) {
+          console.error('Failed to reindex after upload:', error);
+          logStore.logError('Failed to reindex after upload', error as Error);
+          toast.error('Files uploaded but failed to reindex codebase');
+        }
       }
     } catch (error) {
       console.error('Failed to handle file upload:', error);
