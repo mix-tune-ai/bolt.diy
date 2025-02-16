@@ -6,6 +6,7 @@ import { WORK_DIR } from '~/utils/constants';
 import { bufferWatchEvents } from '~/utils/buffer';
 import { computeFileModifications } from '~/utils/diff';
 import { createScopedLogger } from '~/utils/logger';
+import ignore from 'ignore';
 
 const logger = createScopedLogger('FilesStore');
 
@@ -44,6 +45,8 @@ export class FilesStore {
    * Map of files that matches the state of WebContainer.
    */
   files: MapStore<FileMap>;
+
+  #ignorePatterns: ReturnType<typeof ignore> | null = null;
 
   get filesCount() {
     return this.#size;
@@ -91,8 +94,28 @@ export class FilesStore {
     this.#modifiedFiles.clear();
   }
 
+  setIgnorePatterns(patterns: string[]) {
+    this.#ignorePatterns = ignore().add(patterns);
+  }
+
+  isFileIgnored(filePath: string): boolean {
+    if (!this.#ignorePatterns) {
+      return false;
+    }
+
+    return this.#ignorePatterns.ignores(filePath);
+  }
+
   async saveFile(filePath: string, content: string) {
+    if (this.isFileIgnored(filePath)) {
+      logger.warn(`Attempted to save ignored file: ${filePath}`);
+      throw new Error('Cannot modify ignored/protected file');
+    }
+
     try {
+      logger.info(`Attempting to save file: ${filePath}`);
+      console.log('File content:', content.substring(0, 100) + '...'); // Log first 100 chars
+
       const webcontainer = await this.#webcontainer;
       await webcontainer.fs.writeFile(filePath, content);
 
@@ -101,10 +124,28 @@ export class FilesStore {
 
       // Persist to localStorage
       localStorage.setItem('bolt-files', JSON.stringify(this.files.get()));
+      logger.info(`Successfully saved file: ${filePath}`);
+
+      // Log current state of files
+      console.log(
+        'Current files in store:',
+        Object.keys(this.files.get()).map((path) => ({
+          path,
+          contentPreview:
+            this.files.get()[path]?.type === 'file'
+              ? (this.files.get()[path] as File).content.substring(0, 50) + '...'
+              : '[folder]',
+        })),
+      );
 
       return true;
     } catch (error) {
       logger.error('Failed to save file\n\n', error);
+      console.error('Failed to save file:', {
+        filePath,
+        error,
+        currentFiles: Object.keys(this.files.get()),
+      });
       throw error;
     }
   }
@@ -122,8 +163,12 @@ export class FilesStore {
     const watchEvents = events.flat(2);
 
     for (const { type, path, buffer } of watchEvents) {
-      // remove any trailing slashes
       const sanitizedPath = path.replace(/\/+$/g, '');
+
+      if (this.isFileIgnored(sanitizedPath)) {
+        logger.info(`Skipping ignored file: ${sanitizedPath}`);
+        continue;
+      }
 
       switch (type) {
         case 'add_dir': {
@@ -190,6 +235,15 @@ export class FilesStore {
       console.log(error);
       return '';
     }
+  }
+
+  // Add a method to debug current state
+  debugState() {
+    console.log('=== FilesStore Debug State ===');
+    console.log('Total files:', this.#size);
+    console.log('Modified files:', Array.from(this.#modifiedFiles.keys()));
+    console.log('Files in store:', Object.keys(this.files.get()));
+    console.log('========================');
   }
 }
 

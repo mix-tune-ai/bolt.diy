@@ -605,6 +605,17 @@ export class WorkbenchStore {
           continue;
         }
 
+        // Skip ignored files
+        if (this.#filesStore.isFileIgnored(filePath)) {
+          logStore.logInfo(`Skipping ignored file: ${filePath}`, {
+            operation: 'sync-skip-ignored',
+            type: 'file-sync',
+            message: `Protected file skipped: ${filePath}`,
+            file: filePath,
+          });
+          continue;
+        }
+
         const existingFile = this.#filesStore.getFile(filePath);
         const savePromise = this.#filesStore.saveFile(filePath, document.value).then(() => {
           if (!existingFile) {
@@ -646,6 +657,17 @@ export class WorkbenchStore {
       // Then handle any remaining files not loaded in editor
       for (const [filePath, dirent] of Object.entries(files)) {
         if (!dirent?.type || dirent.type !== 'file' || dirent.isBinary || documents[filePath]) {
+          continue;
+        }
+
+        // Skip ignored files
+        if (this.#filesStore.isFileIgnored(filePath)) {
+          logStore.logInfo(`Skipping ignored file: ${filePath}`, {
+            operation: 'sync-skip-ignored',
+            type: 'file-sync',
+            message: `Protected file skipped: ${filePath}`,
+            file: filePath,
+          });
           continue;
         }
 
@@ -740,10 +762,22 @@ export class WorkbenchStore {
 
       for (const file of Array.from(files)) {
         const filePath = path.join(targetDir, file.name);
+        const relativePath = path.relative(wc.workdir, filePath);
+
+        // Skip ignored files
+        if (this.#filesStore.isFileIgnored(relativePath)) {
+          logStore.logWarning('Skipping protected file', {
+            operation: 'upload-skip-protected',
+            type: 'file-upload',
+            message: `Skipped protected file: ${file.name}`,
+            file: relativePath,
+          });
+          toast.warning(`Skipped protected file: ${file.name}`);
+          continue;
+        }
 
         try {
           const content = await file.text();
-          const relativePath = path.relative(wc.workdir, filePath);
 
           // Write file to WebContainer and update store
           await wc.fs.writeFile(relativePath, content);
