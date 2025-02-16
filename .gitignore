@@ -43,7 +43,7 @@ app/commit.json
 changelogUI.md
 docs/instructions/Roadmap.md
 .cursorrules
-# *.md
+*.md
 
 
 pnpm-lock.yaml
