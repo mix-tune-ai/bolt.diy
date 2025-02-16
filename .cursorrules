@@ -155,3 +155,492 @@ bolt.diy (previously oTToDev) is an open-source AI-powered full-stack web develo
 - Don't use white text on white background for dark mode
 - Match the style of the existing codebase
 - Use consistent naming conventions for components and variables
+
+
+
+📦bolt.diy
+ ┃ ┣ 📜COMMIT_EDITMSG
+ ┃ ┣ 📜FETCH_HEAD
+ ┃ ┣ 📜HEAD
+ ┃ ┣ 📜ORIG_HEAD
+ ┃ ┣ 📜config
+ ┃ ┣ 📜description
+ ┃ ┣ 📜index
+ ┃ ┗ 📜packed-refs
+ ┣ 📂.github
+ ┃ ┣ 📂ISSUE_TEMPLATE
+ ┃ ┃ ┣ 📜bug_report.yml
+ ┃ ┃ ┣ 📜config.yml
+ ┃ ┃ ┣ 📜epic.md
+ ┃ ┃ ┣ 📜feature.md
+ ┃ ┃ ┗ 📜feature_request.md
+ ┃ ┣ 📂actions
+ ┃ ┃ ┗ 📂setup-and-build
+ ┃ ┃ ┃ ┗ 📜action.yaml
+ ┃ ┣ 📂scripts
+ ┃ ┃ ┗ 📜generate-changelog.sh
+ ┃ ┗ 📂workflows
+ ┃ ┃ ┣ 📜ci.yaml
+ ┃ ┃ ┣ 📜cloudflare-preview.yml
+ ┃ ┃ ┣ 📜docker.yaml
+ ┃ ┃ ┣ 📜docs.yaml
+ ┃ ┃ ┣ 📜electron.yml
+ ┃ ┃ ┣ 📜pr-release-validation.yaml
+ ┃ ┃ ┣ 📜semantic-pr.yaml
+ ┃ ┃ ┣ 📜stale.yml
+ ┃ ┃ ┗ 📜update-stable.yml
+ ┃ ┗ 📜pre-commit
+ ┣ 📂app
+ ┃ ┣ 📂components
+ ┃ ┃ ┣ 📂@settings
+ ┃ ┃ ┃ ┣ 📂core
+ ┃ ┃ ┃ ┃ ┣ 📜AvatarDropdown.tsx
+ ┃ ┃ ┃ ┃ ┣ 📜ControlPanel.tsx
+ ┃ ┃ ┃ ┃ ┣ 📜constants.ts
+ ┃ ┃ ┃ ┃ ┗ 📜types.ts
+ ┃ ┃ ┃ ┣ 📂shared
+ ┃ ┃ ┃ ┃ ┗ 📂components
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜DraggableTabList.tsx
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜TabManagement.tsx
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜TabTile.tsx
+ ┃ ┃ ┃ ┣ 📂tabs
+ ┃ ┃ ┃ ┃ ┣ 📂connections
+ ┃ ┃ ┃ ┃ ┃ ┣ 📂components
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜ConnectionForm.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜CreateBranchDialog.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜PushToGitHubDialog.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┗ 📜RepositorySelectionDialog.tsx
+ ┃ ┃ ┃ ┃ ┃ ┣ 📂types
+ ┃ ┃ ┃ ┃ ┃ ┃ ┗ 📜GitHub.ts
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜ConnectionsTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂data
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜DataTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂debug
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜DebugTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂event-logs
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜EventLogsTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂features
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜FeaturesTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂notifications
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜NotificationsTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂profile
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜ProfileTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂providers
+ ┃ ┃ ┃ ┃ ┃ ┣ 📂cloud
+ ┃ ┃ ┃ ┃ ┃ ┃ ┗ 📜CloudProvidersTab.tsx
+ ┃ ┃ ┃ ┃ ┃ ┣ 📂local
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜LocalProvidersTab.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┗ 📜OllamaModelInstaller.tsx
+ ┃ ┃ ┃ ┃ ┃ ┣ 📂service-status
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📂providers
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜amazon-bedrock.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜anthropic.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜cohere.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜deepseek.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜google.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜groq.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜huggingface.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜hyperbolic.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜mistral.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜openai.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜openrouter.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜perplexity.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜together.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┃ ┗ 📜xai.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜ServiceStatusTab.tsx
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜base-provider.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┣ 📜provider-factory.ts
+ ┃ ┃ ┃ ┃ ┃ ┃ ┗ 📜types.ts
+ ┃ ┃ ┃ ┃ ┃ ┗ 📂status
+ ┃ ┃ ┃ ┃ ┃ ┃ ┗ 📜ServiceStatusTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂settings
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜SettingsTab.tsx
+ ┃ ┃ ┃ ┃ ┣ 📂task-manager
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜TaskManagerTab.tsx
+ ┃ ┃ ┃ ┃ ┗ 📂update
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜UpdateTab.tsx
+ ┃ ┃ ┃ ┣ 📂utils
+ ┃ ┃ ┃ ┃ ┣ 📜animations.ts
+ ┃ ┃ ┃ ┃ ┗ 📜tab-helpers.ts
+ ┃ ┃ ┃ ┗ 📜index.ts
+ ┃ ┃ ┣ 📂chat
+ ┃ ┃ ┃ ┣ 📂chatExportAndImport
+ ┃ ┃ ┃ ┃ ┣ 📜ExportChatButton.tsx
+ ┃ ┃ ┃ ┃ ┗ 📜ImportButtons.tsx
+ ┃ ┃ ┃ ┣ 📜APIKeyManager.tsx
+ ┃ ┃ ┃ ┣ 📜Artifact.tsx
+ ┃ ┃ ┃ ┣ 📜AssistantMessage.tsx
+ ┃ ┃ ┃ ┣ 📜BaseChat.module.scss
+ ┃ ┃ ┃ ┣ 📜BaseChat.tsx
+ ┃ ┃ ┃ ┣ 📜Chat.client.tsx
+ ┃ ┃ ┃ ┣ 📜ChatAlert.tsx
+ ┃ ┃ ┃ ┣ 📜CodeBlock.module.scss
+ ┃ ┃ ┃ ┣ 📜CodeBlock.tsx
+ ┃ ┃ ┃ ┣ 📜ExamplePrompts.tsx
+ ┃ ┃ ┃ ┣ 📜FilePreview.tsx
+ ┃ ┃ ┃ ┣ 📜GitCloneButton.tsx
+ ┃ ┃ ┃ ┣ 📜ImportFolderButton.tsx
+ ┃ ┃ ┃ ┣ 📜Markdown.module.scss
+ ┃ ┃ ┃ ┣ 📜Markdown.spec.ts
+ ┃ ┃ ┃ ┣ 📜Markdown.tsx
+ ┃ ┃ ┃ ┣ 📜Messages.client.tsx
+ ┃ ┃ ┃ ┣ 📜ModelSelector.tsx
+ ┃ ┃ ┃ ┣ 📜ProgressCompilation.tsx
+ ┃ ┃ ┃ ┣ 📜ScreenshotStateManager.tsx
+ ┃ ┃ ┃ ┣ 📜SendButton.client.tsx
+ ┃ ┃ ┃ ┣ 📜SpeechRecognition.tsx
+ ┃ ┃ ┃ ┣ 📜StarterTemplates.tsx
+ ┃ ┃ ┃ ┣ 📜SupabaseAlert.tsx
+ ┃ ┃ ┃ ┣ 📜ThoughtBox.tsx
+ ┃ ┃ ┃ ┗ 📜UserMessage.tsx
+ ┃ ┃ ┣ 📂editor
+ ┃ ┃ ┃ ┗ 📂codemirror
+ ┃ ┃ ┃ ┃ ┣ 📜BinaryContent.tsx
+ ┃ ┃ ┃ ┃ ┣ 📜CodeMirrorEditor.tsx
+ ┃ ┃ ┃ ┃ ┣ 📜cm-theme.ts
+ ┃ ┃ ┃ ┃ ┣ 📜indent.ts
+ ┃ ┃ ┃ ┃ ┗ 📜languages.ts
+ ┃ ┃ ┣ 📂git
+ ┃ ┃ ┃ ┗ 📜GitUrlImport.client.tsx
+ ┃ ┃ ┣ 📂header
+ ┃ ┃ ┃ ┣ 📜Header.tsx
+ ┃ ┃ ┃ ┗ 📜HeaderActionButtons.client.tsx
+ ┃ ┃ ┣ 📂settings
+ ┃ ┃ ┣ 📂sidebar
+ ┃ ┃ ┃ ┣ 📜HistoryItem.tsx
+ ┃ ┃ ┃ ┣ 📜Menu.client.tsx
+ ┃ ┃ ┃ ┗ 📜date-binning.ts
+ ┃ ┃ ┣ 📂ui
+ ┃ ┃ ┃ ┣ 📂BackgroundRays
+ ┃ ┃ ┃ ┃ ┣ 📜index.tsx
+ ┃ ┃ ┃ ┃ ┗ 📜styles.module.scss
+ ┃ ┃ ┃ ┣ 📜Badge.tsx
+ ┃ ┃ ┃ ┣ 📜Button.tsx
+ ┃ ┃ ┃ ┣ 📜Card.tsx
+ ┃ ┃ ┃ ┣ 📜Collapsible.tsx
+ ┃ ┃ ┃ ┣ 📜Dialog.tsx
+ ┃ ┃ ┃ ┣ 📜Dropdown.tsx
+ ┃ ┃ ┃ ┣ 📜IconButton.tsx
+ ┃ ┃ ┃ ┣ 📜Input.tsx
+ ┃ ┃ ┃ ┣ 📜Label.tsx
+ ┃ ┃ ┃ ┣ 📜LoadingDots.tsx
+ ┃ ┃ ┃ ┣ 📜LoadingOverlay.tsx
+ ┃ ┃ ┃ ┣ 📜PanelHeader.tsx
+ ┃ ┃ ┃ ┣ 📜PanelHeaderButton.tsx
+ ┃ ┃ ┃ ┣ 📜Popover.tsx
+ ┃ ┃ ┃ ┣ 📜Progress.tsx
+ ┃ ┃ ┃ ┣ 📜ScrollArea.tsx
+ ┃ ┃ ┃ ┣ 📜Separator.tsx
+ ┃ ┃ ┃ ┣ 📜SettingsButton.tsx
+ ┃ ┃ ┃ ┣ 📜Slider.tsx
+ ┃ ┃ ┃ ┣ 📜Switch.tsx
+ ┃ ┃ ┃ ┣ 📜Tabs.tsx
+ ┃ ┃ ┃ ┣ 📜ThemeSwitch.tsx
+ ┃ ┃ ┃ ┣ 📜Tooltip.tsx
+ ┃ ┃ ┃ ┗ 📜use-toast.ts
+ ┃ ┃ ┗ 📂workbench
+ ┃ ┃ ┃ ┣ 📂terminal
+ ┃ ┃ ┃ ┃ ┣ 📜Terminal.tsx
+ ┃ ┃ ┃ ┃ ┣ 📜TerminalTabs.tsx
+ ┃ ┃ ┃ ┃ ┗ 📜theme.ts
+ ┃ ┃ ┃ ┣ 📜EditorPanel.tsx
+ ┃ ┃ ┃ ┣ 📜FileBreadcrumb.tsx
+ ┃ ┃ ┃ ┣ 📜FileTree.tsx
+ ┃ ┃ ┃ ┣ 📜PortDropdown.tsx
+ ┃ ┃ ┃ ┣ 📜Preview.tsx
+ ┃ ┃ ┃ ┣ 📜ScreenshotSelector.tsx
+ ┃ ┃ ┃ ┗ 📜Workbench.client.tsx
+ ┃ ┣ 📂lib
+ ┃ ┃ ┣ 📂.server
+ ┃ ┃ ┃ ┗ 📂llm
+ ┃ ┃ ┃ ┃ ┣ 📜constants.ts
+ ┃ ┃ ┃ ┃ ┣ 📜create-summary.ts
+ ┃ ┃ ┃ ┃ ┣ 📜generate-suggestions.ts
+ ┃ ┃ ┃ ┃ ┣ 📜select-context.ts
+ ┃ ┃ ┃ ┃ ┣ 📜stream-text.ts
+ ┃ ┃ ┃ ┃ ┣ 📜switchable-stream.ts
+ ┃ ┃ ┃ ┃ ┗ 📜utils.ts
+ ┃ ┃ ┣ 📂api
+ ┃ ┃ ┃ ┣ 📜connection.ts
+ ┃ ┃ ┃ ┣ 📜cookies.ts
+ ┃ ┃ ┃ ┣ 📜debug.ts
+ ┃ ┃ ┃ ┣ 📜features.ts
+ ┃ ┃ ┃ ┣ 📜notifications.ts
+ ┃ ┃ ┃ ┗ 📜updates.ts
+ ┃ ┃ ┣ 📂common
+ ┃ ┃ ┃ ┣ 📂prompts
+ ┃ ┃ ┃ ┃ ┣ 📜optimized.ts
+ ┃ ┃ ┃ ┃ ┗ 📜prompts.ts
+ ┃ ┃ ┃ ┗ 📜prompt-library.ts
+ ┃ ┃ ┣ 📂hooks
+ ┃ ┃ ┃ ┣ 📜index.ts
+ ┃ ┃ ┃ ┣ 📜useConnectionStatus.ts
+ ┃ ┃ ┃ ┣ 📜useDebugStatus.ts
+ ┃ ┃ ┃ ┣ 📜useEditChatDescription.ts
+ ┃ ┃ ┃ ┣ 📜useFeatures.ts
+ ┃ ┃ ┃ ┣ 📜useGit.ts
+ ┃ ┃ ┃ ┣ 📜useLocalProviders.ts
+ ┃ ┃ ┃ ┣ 📜useMessageParser.ts
+ ┃ ┃ ┃ ┣ 📜useNotifications.ts
+ ┃ ┃ ┃ ┣ 📜usePromptEnhancer.ts
+ ┃ ┃ ┃ ┣ 📜useSearchFilter.ts
+ ┃ ┃ ┃ ┣ 📜useSettings.ts
+ ┃ ┃ ┃ ┣ 📜useShortcuts.ts
+ ┃ ┃ ┃ ┣ 📜useSnapScroll.ts
+ ┃ ┃ ┃ ┣ 📜useUpdateCheck.ts
+ ┃ ┃ ┃ ┗ 📜useViewport.ts
+ ┃ ┃ ┣ 📂modules
+ ┃ ┃ ┃ ┗ 📂llm
+ ┃ ┃ ┃ ┃ ┣ 📂providers
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜amazon-bedrock.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜anthropic.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜cohere.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜deepseek.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜github.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜google.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜groq.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜huggingface.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜hyperbolic.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜lmstudio.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜mistral.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜ollama.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜open-router.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜openai-like.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜openai.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜perplexity.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜together.ts
+ ┃ ┃ ┃ ┃ ┃ ┣ 📜vertex-ai.ts
+ ┃ ┃ ┃ ┃ ┃ ┗ 📜xai.ts
+ ┃ ┃ ┃ ┃ ┣ 📜base-provider.ts
+ ┃ ┃ ┃ ┃ ┣ 📜manager.ts
+ ┃ ┃ ┃ ┃ ┣ 📜registry.ts
+ ┃ ┃ ┃ ┃ ┗ 📜types.ts
+ ┃ ┃ ┣ 📂persistence
+ ┃ ┃ ┃ ┣ 📂document-store
+ ┃ ┃ ┃ ┃ ┣ 📜text-chunker.ts
+ ┃ ┃ ┃ ┃ ┗ 📜vector-store.ts
+ ┃ ┃ ┃ ┣ 📜ChatDescription.client.tsx
+ ┃ ┃ ┃ ┣ 📜db.ts
+ ┃ ┃ ┃ ┣ 📜index.ts
+ ┃ ┃ ┃ ┣ 📜localStorage.ts
+ ┃ ┃ ┃ ┗ 📜useChatHistory.ts
+ ┃ ┃ ┣ 📂runtime
+ ┃ ┃ ┃ ┣ 📂__snapshots__
+ ┃ ┃ ┃ ┃ ┗ 📜message-parser.spec.ts.snap
+ ┃ ┃ ┃ ┣ 📜action-runner.ts
+ ┃ ┃ ┃ ┣ 📜message-parser.spec.ts
+ ┃ ┃ ┃ ┗ 📜message-parser.ts
+ ┃ ┃ ┣ 📂stores
+ ┃ ┃ ┃ ┣ 📜chat.ts
+ ┃ ┃ ┃ ┣ 📜editor.ts
+ ┃ ┃ ┃ ┣ 📜files.ts
+ ┃ ┃ ┃ ┣ 📜logs.ts
+ ┃ ┃ ┃ ┣ 📜previews.ts
+ ┃ ┃ ┃ ┣ 📜profile.ts
+ ┃ ┃ ┃ ┣ 📜settings.ts
+ ┃ ┃ ┃ ┣ 📜tabConfigurationStore.ts
+ ┃ ┃ ┃ ┣ 📜terminal.ts
+ ┃ ┃ ┃ ┣ 📜theme.ts
+ ┃ ┃ ┃ ┗ 📜workbench.ts
+ ┃ ┃ ┣ 📂webcontainer
+ ┃ ┃ ┃ ┣ 📜auth.client.ts
+ ┃ ┃ ┃ ┗ 📜index.ts
+ ┃ ┃ ┣ 📜crypto.ts
+ ┃ ┃ ┗ 📜fetch.ts
+ ┃ ┣ 📂routes
+ ┃ ┃ ┣ 📜_index.tsx
+ ┃ ┃ ┣ 📜api.chat.ts
+ ┃ ┃ ┣ 📜api.check-env-key.ts
+ ┃ ┃ ┣ 📜api.enhancer.ts
+ ┃ ┃ ┣ 📜api.git-proxy.$.ts
+ ┃ ┃ ┣ 📜api.health.ts
+ ┃ ┃ ┣ 📜api.llmcall.ts
+ ┃ ┃ ┣ 📜api.models.$provider.ts
+ ┃ ┃ ┣ 📜api.models.ts
+ ┃ ┃ ┣ 📜api.system.app-info.ts
+ ┃ ┃ ┣ 📜api.system.git-info.ts
+ ┃ ┃ ┣ 📜api.update.ts
+ ┃ ┃ ┣ 📜chat.$id.tsx
+ ┃ ┃ ┣ 📜git.tsx
+ ┃ ┃ ┗ 📜webcontainer.preview.$id.tsx
+ ┃ ┣ 📂styles
+ ┃ ┃ ┣ 📂components
+ ┃ ┃ ┃ ┣ 📜code.scss
+ ┃ ┃ ┃ ┣ 📜editor.scss
+ ┃ ┃ ┃ ┣ 📜resize-handle.scss
+ ┃ ┃ ┃ ┣ 📜terminal.scss
+ ┃ ┃ ┃ ┗ 📜toast.scss
+ ┃ ┃ ┣ 📜animations.scss
+ ┃ ┃ ┣ 📜index.scss
+ ┃ ┃ ┣ 📜variables.scss
+ ┃ ┃ ┗ 📜z-index.scss
+ ┃ ┣ 📂types
+ ┃ ┃ ┣ 📜GitHub.ts
+ ┃ ┃ ┣ 📜actions.ts
+ ┃ ┃ ┣ 📜artifact.ts
+ ┃ ┃ ┣ 📜context.ts
+ ┃ ┃ ┣ 📜global.d.ts
+ ┃ ┃ ┣ 📜model.ts
+ ┃ ┃ ┣ 📜template.ts
+ ┃ ┃ ┣ 📜terminal.ts
+ ┃ ┃ ┗ 📜theme.ts
+ ┃ ┣ 📂utils
+ ┃ ┃ ┣ 📜buffer.ts
+ ┃ ┃ ┣ 📜classNames.ts
+ ┃ ┃ ┣ 📜constants.ts
+ ┃ ┃ ┣ 📜debounce.ts
+ ┃ ┃ ┣ 📜diff.spec.ts
+ ┃ ┃ ┣ 📜diff.ts
+ ┃ ┃ ┣ 📜easings.ts
+ ┃ ┃ ┣ 📜fileUtils.ts
+ ┃ ┃ ┣ 📜folderImport.ts
+ ┃ ┃ ┣ 📜formatSize.ts
+ ┃ ┃ ┣ 📜logger.ts
+ ┃ ┃ ┣ 📜markdown.ts
+ ┃ ┃ ┣ 📜mobile.ts
+ ┃ ┃ ┣ 📜os.ts
+ ┃ ┃ ┣ 📜path.ts
+ ┃ ┃ ┣ 📜projectCommands.ts
+ ┃ ┃ ┣ 📜promises.ts
+ ┃ ┃ ┣ 📜react.ts
+ ┃ ┃ ┣ 📜sampler.ts
+ ┃ ┃ ┣ 📜selectStarterTemplate.ts
+ ┃ ┃ ┣ 📜shell.ts
+ ┃ ┃ ┣ 📜stacktrace.ts
+ ┃ ┃ ┣ 📜stripIndent.ts
+ ┃ ┃ ┣ 📜terminal.ts
+ ┃ ┃ ┣ 📜types.ts
+ ┃ ┃ ┗ 📜unreachable.ts
+ ┃ ┣ 📜entry.client.tsx
+ ┃ ┣ 📜entry.server.tsx
+ ┃ ┣ 📜root.tsx
+ ┃ ┗ 📜vite-env.d.ts
+ ┣ 📂docs
+ ┃ ┣ 📂docs
+ ┃ ┃ ┣ 📜CONTRIBUTING.md
+ ┃ ┃ ┣ 📜FAQ.md
+ ┃ ┃ ┗ 📜index.md
+ ┃ ┣ 📂images
+ ┃ ┃ ┣ 📜api-key-ui-section.png
+ ┃ ┃ ┣ 📜bolt-settings-button.png
+ ┃ ┃ ┗ 📜provider-base-url.png
+ ┃ ┣ 📜.gitignore
+ ┃ ┣ 📜.python-version
+ ┃ ┣ 📜README.md
+ ┃ ┣ 📜mkdocs.yml
+ ┃ ┣ 📜poetry.lock
+ ┃ ┗ 📜pyproject.toml
+ ┣ 📂electron
+ ┃ ┣ 📂main
+ ┃ ┃ ┣ 📂ui
+ ┃ ┃ ┃ ┣ 📜menu.ts
+ ┃ ┃ ┃ ┗ 📜window.ts
+ ┃ ┃ ┣ 📂utils
+ ┃ ┃ ┃ ┣ 📜auto-update.ts
+ ┃ ┃ ┃ ┣ 📜constants.ts
+ ┃ ┃ ┃ ┣ 📜cookie.ts
+ ┃ ┃ ┃ ┣ 📜reload.ts
+ ┃ ┃ ┃ ┣ 📜serve.ts
+ ┃ ┃ ┃ ┣ 📜store.ts
+ ┃ ┃ ┃ ┗ 📜vite-server.ts
+ ┃ ┃ ┣ 📜index.ts
+ ┃ ┃ ┣ 📜tsconfig.json
+ ┃ ┃ ┗ 📜vite.config.ts
+ ┃ ┗ 📂preload
+ ┃ ┃ ┣ 📜index.ts
+ ┃ ┃ ┣ 📜tsconfig.json
+ ┃ ┃ ┗ 📜vite.config.ts
+ ┣ 📂functions
+ ┃ ┗ 📜[[path]].ts
+ ┣ 📂icons
+ ┃ ┣ 📜angular.svg
+ ┃ ┣ 📜astro.svg
+ ┃ ┣ 📜chat.svg
+ ┃ ┣ 📜icon.icns
+ ┃ ┣ 📜icon.ico
+ ┃ ┣ 📜icon.png
+ ┃ ┣ 📜logo-text.svg
+ ┃ ┣ 📜logo.svg
+ ┃ ┣ 📜nativescript.svg
+ ┃ ┣ 📜nextjs.svg
+ ┃ ┣ 📜nuxt.svg
+ ┃ ┣ 📜qwik.svg
+ ┃ ┣ 📜react.svg
+ ┃ ┣ 📜remix.svg
+ ┃ ┣ 📜remotion.svg
+ ┃ ┣ 📜slidev.svg
+ ┃ ┣ 📜stars.svg
+ ┃ ┣ 📜svelte.svg
+ ┃ ┣ 📜typescript.svg
+ ┃ ┣ 📜vite.svg
+ ┃ ┗ 📜vue.svg
+ ┣ 📂public
+ ┃ ┣ 📂icons
+ ┃ ┃ ┣ 📜AmazonBedrock.svg
+ ┃ ┃ ┣ 📜Anthropic.svg
+ ┃ ┃ ┣ 📜Cohere.svg
+ ┃ ┃ ┣ 📜Deepseek.svg
+ ┃ ┃ ┣ 📜Default.svg
+ ┃ ┃ ┣ 📜Google.svg
+ ┃ ┃ ┣ 📜Groq.svg
+ ┃ ┃ ┣ 📜HuggingFace.svg
+ ┃ ┃ ┣ 📜Hyperbolic.svg
+ ┃ ┃ ┣ 📜LMStudio.svg
+ ┃ ┃ ┣ 📜Mistral.svg
+ ┃ ┃ ┣ 📜Ollama.svg
+ ┃ ┃ ┣ 📜OpenAI.svg
+ ┃ ┃ ┣ 📜OpenAILike.svg
+ ┃ ┃ ┣ 📜OpenRouter.svg
+ ┃ ┃ ┣ 📜Perplexity.svg
+ ┃ ┃ ┣ 📜Together.svg
+ ┃ ┃ ┗ 📜xAI.svg
+ ┃ ┣ 📂supabase
+ ┃ ┃ ┗ 📜supabase-logo-icon.png
+ ┃ ┣ 📜apple-touch-icon-precomposed.png
+ ┃ ┣ 📜apple-touch-icon.png
+ ┃ ┣ 📜favicon.ico
+ ┃ ┣ 📜favicon.svg
+ ┃ ┣ 📜logo-dark-styled.png
+ ┃ ┣ 📜logo-dark.png
+ ┃ ┣ 📜logo-light-styled.png
+ ┃ ┣ 📜logo-light.png
+ ┃ ┣ 📜logo.svg
+ ┃ ┗ 📜social_preview_index.jpg
+ ┣ 📂scripts
+ ┃ ┣ 📜clean.js
+ ┃ ┣ 📜update-imports.sh
+ ┃ ┗ 📜update.sh
+ ┣ 📂types
+ ┃ ┗ 📜istextorbinary.d.ts
+ ┣ 📜.DS_Store
+ ┣ 📜.cursorrules
+ ┣ 📜.dockerignore
+ ┣ 📜.editorconfig
+ ┣ 📜.env.example
+ ┣ 📜.env.local
+ ┣ 📜.gitignore
+ ┣ 📜.prettierignore
+ ┣ 📜.prettierrc
+ ┣ 📜CONTRIBUTING.md
+ ┣ 📜Dockerfile
+ ┣ 📜FAQ.md
+ ┣ 📜LICENSE
+ ┣ 📜PROJECT.md
+ ┣ 📜README.md
+ ┣ 📜bindings.sh
+ ┣ 📜changelog.md
+ ┣ 📜docker-compose.yaml
+ ┣ 📜electron-builder.yml
+ ┣ 📜electron-update.yml
+ ┣ 📜entitlements.mac.plist
+ ┣ 📜eslint.config.mjs
+ ┣ 📜load-context.ts
+ ┣ 📜notarize.cjs
+ ┣ 📜package.json
+ ┣ 📜pnpm-lock.yaml
+ ┣ 📜pre-start.cjs
+ ┣ 📜tsconfig.json
+ ┣ 📜uno.config.ts
+ ┣ 📜vite-electron.config.ts
+ ┣ 📜vite.config.ts
+ ┗ 📜worker-configuration.d.ts
